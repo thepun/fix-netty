@@ -1,0 +1,12 @@
+apply plugin: 'idea'
+
+idea {
+    module {
+        downloadJavadoc = true
+        downloadSources = true
+        inheritOutputDirs = false
+        outputDir = file('build/idea')
+        testOutputDir = file('build/idea_test')
+        excludeDirs += file('.idea')
+    }
+}

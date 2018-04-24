@@ -39,13 +39,13 @@ uploadArchives {
             pom.project {
                 name 'Unsafe utils'
                 packaging 'jar'
-                description 'Utility library for easier access to sun.misc.Unsafe class'
-                url 'https://github.com/thepun/unsafe-utils'
+                description 'Example implementation of fix for netty'
+                url 'https://github.com/thepun/fix-netty'
 
                 scm {
-                    connection 'scm:git:git://github.com/thepun/unsafe-utils.git'
-                    developerConnection 'scm:git:ssh://github.com/thepun/unsafe-utils.git'
-                    url 'https://github.com/thepun/unsafe-utils/tree/master'
+                    connection 'scm:git:git://github.com/thepun/fix-netty.git'
+                    developerConnection 'scm:git:ssh://github.com/thepun/fix-netty.git'
+                    url 'https://github.com/thepun/fix-netty/tree/master'
                 }
 
                 licenses {

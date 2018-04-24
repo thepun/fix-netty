@@ -1,5 +1,7 @@
 package io.github.thepun.fix.md.codec;
 
+import io.github.thepun.fix.common.Logon;
+import io.github.thepun.fix.md.domain.MarketDataSnapshotFullRefresh;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
@@ -8,7 +10,15 @@ import io.netty.util.CharsetUtil;
 final class MarketDataEncoder extends MessageToByteEncoder<Object> {
 
     @Override
-    public void encode(ChannelHandlerContext ctx, Object message, ByteBuf out) throws Exception {
+    public void encode(ChannelHandlerContext ctx, Object message, ByteBuf out) {
+        if (message instanceof MarketDataSnapshotFullRefresh) {
+
+        } else if (message instanceof Logon) {
+            encodeLogon((Logon) message);
+        } else {
+
+        }
+
         int initialOffset = out.writerIndex();
 
         ByteBuf bodyBuf = ctx.alloc().buffer();
@@ -80,5 +90,11 @@ final class MarketDataEncoder extends MessageToByteEncoder<Object> {
             sum += buf.getByte(i);
         }
         return sum % 256;
+    }
+
+
+
+    private void encodeLogon(Logon logon) {
+
     }
 }

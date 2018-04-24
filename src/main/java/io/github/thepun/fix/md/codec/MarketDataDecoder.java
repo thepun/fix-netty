@@ -1,14 +1,11 @@
 package io.github.thepun.fix.md.codec;
 
-import com.sfs.acceptance.common.HasInt;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.DecoderException;
 
 import java.util.List;
-
-import static com.sfs.acceptance.transport.fix.Header.BeginString;
 
 final class MarketDataDecoder extends ByteToMessageDecoder {
 

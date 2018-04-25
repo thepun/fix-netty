@@ -1,5 +1,6 @@
 package io.github.thepun.fix.md.domain;
 
+import io.github.thepun.unsafe.chars.OffHeapCharSequence;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.AbstractReferenceCounted;
 import io.netty.util.Recycler;
@@ -20,15 +21,26 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
     }
 
 
+    private final OffHeapCharSequence mdReqID;
+    private final OffHeapCharSequence symbol;
     private final Recycler.Handle<MarketDataSnapshotFullRefresh> recyclerHandle;
 
     private ByteBuf messageBuffer;
-    private String mdReqID;
-    private String symbol;
     private MDEntryGroup[] entries;
 
     private MarketDataSnapshotFullRefresh(Recycler.Handle<MarketDataSnapshotFullRefresh> recyclerHandle) {
         this.recyclerHandle = recyclerHandle;
+
+        mdReqID = new OffHeapCharSequence();
+        symbol = new OffHeapCharSequence();
+    }
+
+    public OffHeapCharSequence getMdReqID() {
+        return mdReqID;
+    }
+
+    public OffHeapCharSequence getSymbol() {
+        return symbol;
     }
 
     public ByteBuf getMessageBuffer() {
@@ -46,22 +58,6 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
 
     public void setEntries(MDEntryGroup[] entries) {
         this.entries = entries;
-    }
-
-    public String getMdReqID() {
-        return mdReqID;
-    }
-
-    public void setMdReqID(String mdReqID) {
-        this.mdReqID = mdReqID;
-    }
-
-    public String getSymbol() {
-        return symbol;
-    }
-
-    public void setSymbol(String symbol) {
-        this.symbol = symbol;
     }
 
     public int getEntryCount() {

@@ -1,5 +1,7 @@
 package io.github.thepun.fix.md.domain;
 
+import io.github.thepun.unsafe.chars.OffHeapCharSequence;
+
 public final class MDEntryGroup {
 
     public static final int MD_UPDATE_ACTION_NEW = 0;
@@ -14,13 +16,19 @@ public final class MDEntryGroup {
     public static final int QUOTE_CONDITION_CONSOLIDATED_BEST = (int) 'D';
 
 
+    private final OffHeapCharSequence symbol;
+    private final OffHeapCharSequence currency;
+
     private int mdUpdateAction;
     private int mdEntryType;
-    private String symbol;
-    private String currency;
     private double mdEntryPX;
     private double mdEntrySize;
     private int quoteCondition;
+
+    public MDEntryGroup() {
+        symbol = new OffHeapCharSequence();
+        currency = new OffHeapCharSequence();
+    }
 
     public int getMdUpdateAction() {
         return mdUpdateAction;
@@ -38,20 +46,12 @@ public final class MDEntryGroup {
         this.mdEntryType = mdEntryType;
     }
 
-    public String getSymbol() {
+    public OffHeapCharSequence getSymbol() {
         return symbol;
     }
 
-    public void setSymbol(String symbol) {
-        this.symbol = symbol;
-    }
-
-    public String getCurrency() {
+    public OffHeapCharSequence getCurrency() {
         return currency;
-    }
-
-    public void setCurrency(String currency) {
-        this.currency = currency;
     }
 
     public double getMdEntryPX() {

@@ -1,17 +1,17 @@
-package io.github.thepun.fix.md.codec;
+package io.github.thepun.fix.md;
 
 import io.github.thepun.fix.Fields;
 import io.github.thepun.fix.MsgTypes;
+import io.github.thepun.fix.md.domain.MDEntryGroup;
 import io.github.thepun.fix.md.domain.MarketDataSnapshotFullRefresh;
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.handler.codec.ByteToMessageDecoder;
+import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.DecoderException;
 
-import java.util.List;
-
-final class MarketDataDecoder extends ChannelInboundHandlerAdapter {
+final class MarketDataHandler extends ChannelDuplexHandler {
 
     private static final class Cursor {
         private ByteBuf in;
@@ -20,9 +20,10 @@ final class MarketDataDecoder extends ChannelInboundHandlerAdapter {
         private int tag;
         private int intValue;
         private int strAsInt;
-        private int strStart;
+        private long strStart;
         private int strLength;
-        private int nativeAddress;
+        private long nativeAddress;
+        private double doubleValue;
     }
 
 
@@ -99,11 +100,19 @@ final class MarketDataDecoder extends ChannelInboundHandlerAdapter {
                 // read message content
                 switch (msgType) {
                     case MsgTypes.MARKET_DATA_SNAPSHOT_FULL_REFRESH:
-                        MarketDataSnapshotFullRefresh message = MarketDataSnapshotFullRefresh.newInstance();
-                        message.setMessageBuffer(in);
-                        parseMarketDataSnapshotFullRefresh(cursor, message);
+                        MarketDataSnapshotFullRefresh fixMsg = MarketDataSnapshotFullRefresh.newInstance();
+                        fixMsg.setMessageBuffer(in);
+                        parseMarketDataSnapshotFullRefresh(cursor, fixMsg);
+                        ctx.fireChannelRead(fixMsg);
+                        break;
 
-                    case MsgTypes.LOGON_MSG_TYPE:
+                    case MsgTypes.MARKET_DATA_REJECT:
+                        break;
+
+                    case MsgTypes.LOGOUT:
+                        break;
+
+                    case MsgTypes.LOGON:
                         break;
                 }
             }
@@ -112,29 +121,59 @@ final class MarketDataDecoder extends ChannelInboundHandlerAdapter {
         }
     }
 
+    @Override
+    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+
+        super.write(ctx, msg, promise);
+    }
+
     private static void parseMarketDataSnapshotFullRefresh(Cursor cursor, MarketDataSnapshotFullRefresh message) {
-        // MDReqID
+        // req id
         parseTag(cursor);
         ensureTag(cursor, Fields.MD_REQ_ID);
         parseStrValue(cursor);
         message.getMdReqID().setAddress(cursor.strStart, cursor.strLength);
 
-        // Symbol
+        // symbol
         parseTag(cursor);
         ensureTag(cursor, Fields.SYMBOL);
         parseStrValue(cursor);
         message.getSymbol().setAddress(cursor.strStart, cursor.strLength);
 
-        // MD entries
+        // count of MD entries
         parseTag(cursor);
         ensureTag(cursor, Fields.NO_MD_ENTRIES);
         parseIntValue(cursor);
         int mdEntriesCount = cursor.intValue;
-        for (int i = 0; i < mdEntriesCount; i++) {
-            // MD entry
-            parseTag(cursor);
-            ensureTag(cursor, Fields.NO_MD_ENTRIES);
+        message.setEntryCount(mdEntriesCount);
 
+        // MD entry loop
+        for (int i = 0; i < mdEntriesCount; i++) {
+            MDEntryGroup entry = message.getEntry(i);
+
+            // type
+            parseTag(cursor);
+            ensureTag(cursor, Fields.MD_ENTRY_TYPE);
+            parseIntValue(cursor);
+            entry.setMdEntryType(cursor.intValue);
+
+            // id
+            parseTag(cursor);
+            ensureTag(cursor, Fields.MD_ENTRY_ID);
+            parseStrValue(cursor);
+            entry.getId().setAddress(cursor.strStart, cursor.strLength);
+
+            // price
+            parseTag(cursor);
+            ensureTag(cursor, Fields.MD_ENTRY_PX);
+            parseDoubleValue(cursor);
+            entry.setMdEntryPX(cursor.doubleValue);
+
+            // volume
+            parseTag(cursor);
+            ensureTag(cursor, Fields.MD_ENTRY_SIZE);
+            parseDoubleValue(cursor);
+            entry.setMdEntrySize(cursor.doubleValue);
         }
     }
 
@@ -157,6 +196,10 @@ final class MarketDataDecoder extends ChannelInboundHandlerAdapter {
     }
 
     private static void parseIntValue(Cursor cursor) {
+
+    }
+
+    private static void parseDoubleValue(Cursor cursor) {
 
     }
 

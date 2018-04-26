@@ -16,6 +16,7 @@ public final class MDEntryGroup {
     public static final int QUOTE_CONDITION_CONSOLIDATED_BEST = (int) 'D';
 
 
+    private final OffHeapCharSequence id;
     private final OffHeapCharSequence symbol;
     private final OffHeapCharSequence currency;
 
@@ -26,8 +27,21 @@ public final class MDEntryGroup {
     private int quoteCondition;
 
     public MDEntryGroup() {
+        id = new OffHeapCharSequence();
         symbol = new OffHeapCharSequence();
         currency = new OffHeapCharSequence();
+    }
+
+    public OffHeapCharSequence getId() {
+        return id;
+    }
+
+    public OffHeapCharSequence getSymbol() {
+        return symbol;
+    }
+
+    public OffHeapCharSequence getCurrency() {
+        return currency;
     }
 
     public int getMdUpdateAction() {
@@ -44,14 +58,6 @@ public final class MDEntryGroup {
 
     public void setMdEntryType(int mdEntryType) {
         this.mdEntryType = mdEntryType;
-    }
-
-    public OffHeapCharSequence getSymbol() {
-        return symbol;
-    }
-
-    public OffHeapCharSequence getCurrency() {
-        return currency;
     }
 
     public double getMdEntryPX() {

@@ -1,6 +1,6 @@
 package io.github.thepun.fix;
 
-public interface MarketDataDisconnectListener {
+public interface FixDisconnectListener {
 
     void onDisconnect();
 

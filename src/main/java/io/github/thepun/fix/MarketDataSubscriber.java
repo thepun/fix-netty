@@ -1,9 +1,7 @@
 package io.github.thepun.fix;
 
-import io.netty.util.concurrent.Future;
-
 public interface MarketDataSubscriber {
 
-    Future<Void> subscribe(String symbol, String id);
+    void subscribe(String id, String symbol, int marketDepth);
 
 }

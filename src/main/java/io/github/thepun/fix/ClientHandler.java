@@ -1,174 +1,152 @@
 package io.github.thepun.fix;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPromise;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 
-final class ClientHandler extends ChannelDuplexHandler {
+import static io.github.thepun.fix.FixDecodingUtils.*;
 
+final class ClientHandler extends ChannelInboundHandlerAdapter {
+
+    private final Logon logon;
+    private final Logout logout;
+    private final MarketDataRequestReject reject;
 
     private final FixLogger fixLogger;
-    private final MarketDataSnapshotListener snapshotListener;
-    private final MarketDataConnectListener connectListener;
-    private final MarketDataDisconnectListener disconnectListener;
+    private final MarketDataReadyListener readyListener;
+    private final MarketDataQuotesListener quotesListener;
 
     private ByteBuf buffer;
+    private String sessionName;
 
-    ClientHandler(FixLogger fixLogger, MarketDataSnapshotListener snapshotListener, MarketDataConnectListener connectListener, MarketDataDisconnectListener disconnectListener) {
+    ClientHandler(FixLogger fixLogger, MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener) {
         this.fixLogger = fixLogger;
-        this.snapshotListener = snapshotListener;
-        this.connectListener = connectListener;
-        this.disconnectListener = disconnectListener;
+        this.readyListener = readyListener;
+        this.quotesListener = quotesListener;
+
+        logon = new Logon();
+        logout = new Logout();
+        reject = new MarketDataRequestReject();
+    }
+
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        sessionName = ctx.channel().toString();
+        super.channelActive(ctx);
     }
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
         if (msg instanceof ByteBuf) {
             ByteBuf msgByteBuf = (ByteBuf) msg;
-
-            // check if we should read from buffer first
-            ByteBuf in;
-            boolean readFromMsg;
-            if (buffer.isReadable()) {
-                buffer.writeBytes(msgByteBuf);
-                in = buffer;
-                readFromMsg = false;
-            } else {
-                in = msgByteBuf;
-                readFromMsg = true;
-            }
-
-            int length;
-            int msgType;
-
-            // prepare cursor object
-            FixParserCursor cursor = new FixParserCursor();
-            cursor.setIn(in);
-            cursor.setIndex(in.readerIndex());
-            cursor.setCount(in.readableBytes());
-
-            // read until the end
-            while (cursor.getIndex() < cursor.getCount()) {
-                // read fix
-                FixParser.parseTag(cursor);
-                FixParser.ensureTag(cursor, Fields.BEGIN_STRING);
-                cursor.setIndex(cursor.getIndex() + 8);
-
-                // read length
-                FixParser.parseTag(cursor);
-                FixParser.ensureTag(cursor, Fields.BODY_LENGTH);
-                FixParser.parseIntValue(cursor);
-                length = cursor.getIntValue();
-
-                // check we have enough bytes
-                if (cursor.getIndex() + length >= cursor.getCount()) {
-                    // if we processing original incoming message
-                    if (readFromMsg) {
-                        // save message to local buffer
-                        buffer.writeBytes(msgByteBuf);
-                    }
-
-                    return;
-                }
-
-                // read message type
-                FixParser.parseTag(cursor);
-                FixParser.ensureTag(cursor, Fields.MSG_TYPE);
-                FixParser.parseStrValueAsInt(cursor);
-                msgType = cursor.getStrAsInt();
-
-                // read session info (SenderCompId | TargetCompId | SenderSubId | TargetSubId | MsgSeqNum | SendingTime)
-                for (int i = 0; i < 6; i++) {
-                    FixParser.skipTagAndValue(cursor);
-                }
-
-                // read message content
-                switch (msgType) {
-                    case MsgTypes.MARKET_DATA_SNAPSHOT_FULL_REFRESH:
-                        MarketDataSnapshotFullRefresh snapshot = MarketDataSnapshotFullRefresh.newInstance();
-                        parseMarketDataSnapshotFullRefresh(cursor, snapshot);
-                        snapshot.setMessageBuffer(in);
-                        snapshotListener.onMarketData(snapshot);
-                        break;
-
-                    case MsgTypes.MARKET_DATA_REJECT:
-                        MarketDataReject reject = new MarketDataReject();
-                        parseMarketDataReject(cursor, reject);
-                        break;
-
-                    case MsgTypes.LOGOUT:
-
-                        ctx.close();
-                        break;
-
-                    case MsgTypes.LOGON:
-                        break;
-                }
-            }
+            readMessage(ctx, msgByteBuf);
         } else {
-            // error
+            fixLogger.status("Unknown message: " + msg.getClass().getName());
         }
     }
 
-    @Override
-    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+    private void readMessage(ChannelHandlerContext ctx, ByteBuf msgByteBuf) {
+        // check if we should read from buffer first
+        ByteBuf in;
+        boolean readFromMsg;
+        if (buffer.isReadable()) {
+            buffer.writeBytes(msgByteBuf);
+            in = buffer;
+            readFromMsg = false;
+        } else {
+            in = msgByteBuf;
+            readFromMsg = true;
+        }
 
-        super.write(ctx, msg, promise);
-    }
+        int start;
+        int length;
+        int msgType;
 
-    private static void parseMarketDataSnapshotFullRefresh(FixParserCursor cursor, MarketDataSnapshotFullRefresh message) {
-        // req id
-        FixParser.parseTag(cursor);
-        FixParser.ensureTag(cursor, Fields.MD_REQ_ID);
-        FixParser.parseStrValue(cursor);
-        message.getMdReqID().setAddress(cursor.getStrStart(), cursor.getStrLength());
+        // prepare cursor object
+        FixDecodingCursor cursor = new FixDecodingCursor();
+        cursor.setIn(in);
+        cursor.setIndex(in.readerIndex());
+        cursor.setCount(in.readableBytes());
 
-        // symbol
-        FixParser.parseTag(cursor);
-        FixParser.ensureTag(cursor, Fields.SYMBOL);
-        FixParser.parseStrValue(cursor);
-        message.getSymbol().setAddress(cursor.getStrStart(), cursor.getStrLength());
+        // read until the end
+        while (cursor.getIndex() < cursor.getCount()) {
+            // remember message start
+            start = cursor.getIndex();
 
-        // count of MD entries
-        FixParser.parseTag(cursor);
-        FixParser.ensureTag(cursor, Fields.NO_MD_ENTRIES);
-        FixParser.parseIntValue(cursor);
-        int mdEntriesCount = cursor.getIntValue();
-        message.setEntryCount(mdEntriesCount);
+            // read fix
+            decodeTag(cursor);
+            ensureTag(cursor, Fields.BEGIN_STRING);
+            cursor.setIndex(cursor.getIndex() + 8);
 
-        // MD entry loop
-        for (int i = 0; i < mdEntriesCount; i++) {
-            MarketDataSnapshotFullRefresh.MDEntryGroup entry = message.getEntry(i);
+            // read length
+            decodeTag(cursor);
+            ensureTag(cursor, Fields.BODY_LENGTH);
+            decodeIntValue(cursor);
+            length = cursor.getIntValue();
 
-            // type
-            FixParser.parseTag(cursor);
-            FixParser.ensureTag(cursor, Fields.MD_ENTRY_TYPE);
-            FixParser.parseIntValue(cursor);
-            entry.setMdEntryType(cursor.getIntValue());
+            // check we have enough bytes
+            if (cursor.getIndex() + length >= cursor.getCount()) {
+                // if we processing original incoming message
+                if (readFromMsg) {
+                    // save message to local buffer
+                    buffer.writeBytes(msgByteBuf);
+                }
 
-            // id
-            FixParser.parseTag(cursor);
-            FixParser.ensureTag(cursor, Fields.MD_ENTRY_ID);
-            FixParser.parseStrValue(cursor);
-            entry.getId().setAddress(cursor.getStrStart(), cursor.getStrLength());
+                return;
+            }
 
-            // price
-            FixParser.parseTag(cursor);
-            FixParser.ensureTag(cursor, Fields.MD_ENTRY_PX);
-            FixParser.parseDoubleValue(cursor);
-            entry.setMdEntryPX(cursor.getDoubleValue());
+            // log message
+            fixLogger.incoming(in, start, length);
 
-            // volume
-            FixParser.parseTag(cursor);
-            FixParser.ensureTag(cursor, Fields.MD_ENTRY_SIZE);
-            FixParser.parseDoubleValue(cursor);
-            entry.setMdEntrySize(cursor.getDoubleValue());
+            // read message type
+            decodeTag(cursor);
+            ensureTag(cursor, Fields.MSG_TYPE);
+            decodeStrValueAsInt(cursor);
+            msgType = cursor.getStrAsInt();
+
+            // read session info (SenderCompId | TargetCompId | SenderSubId | TargetSubId | MsgSeqNum | SendingTime)
+            for (int i = 0; i < 6; i++) {
+                skipTagAndValue(cursor);
+            }
+
+            // read message content
+            switch (msgType) {
+                case MsgTypes.MASS_QUOTE:
+                    MassQuote quotes = MassQuote.newInstance();
+                    decodeMassQuote(cursor, quotes);
+                    //quotes.setMessageBuffer(in);
+                    quotesListener.onMarketData(quotes);
+                    break;
+
+                /*case MsgTypes.MARKET_DATA_SNAPSHOT_FULL_REFRESH:
+                    MarketDataSnapshotFullRefresh snapshot = MarketDataSnapshotFullRefresh.newInstance();
+                    decodeMarketDataSnapshotFullRefresh(cursor, snapshot);
+                    snapshot.setMessageBuffer(in);
+                    snapshotListener.onMarketData(snapshot);
+                    break;*/
+
+                case MsgTypes.MARKET_DATA_REJECT:
+                    decodeMarketDataReject(cursor, reject);
+                    fixLogger.status("Market data request with id " + reject.getMdReqID() + " in session " + sessionName + " was rejected: " + reject.getText());
+                    break;
+
+                case MsgTypes.LOGON:
+                    decodeLogon(cursor, logon);
+                    fixLogger.status("Logon in session " + sessionName);
+                    SubscriptionSender subscriptionSender = new SubscriptionSender(ctx);
+                    readyListener.onReady(subscriptionSender);
+                    subscriptionSender.disable();
+                    break;
+
+                case MsgTypes.LOGOUT:
+                    decodeLogout(cursor, logout);
+                    fixLogger.status("Logout in session " + sessionName);
+                    ctx.close();
+                    break;
+
+                default:
+                    fixLogger.status("Unknown message type in session " + sessionName + ": " + msgType);
+            }
         }
     }
-
-    private static void parseMarketDataReject(FixParserCursor cursor, MarketDataReject message) {
-
-    }
-
 }

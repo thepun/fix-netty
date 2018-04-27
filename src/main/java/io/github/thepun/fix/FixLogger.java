@@ -4,6 +4,8 @@ import io.netty.buffer.ByteBuf;
 
 public interface FixLogger {
 
-    void message(ByteBuf buffer, int offset, int length);
+    void status(String status);
+    void incoming(ByteBuf buffer, int offset, int length);
+    void outgoing(ByteBuf buffer, int offset, int length);
 
 }

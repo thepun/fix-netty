@@ -1,4 +1,4 @@
-package io.github.thepun.fix.md;
+package io.github.thepun.fix;
 
 final class MarketDataReject {
 }

@@ -1,7 +1,5 @@
-package io.github.thepun.fix.md;
+package io.github.thepun.fix;
 
-import io.github.thepun.fix.md.Logon;
-import io.github.thepun.fix.md.MarketDataSnapshotFullRefresh;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;

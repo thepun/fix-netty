@@ -1,17 +1,15 @@
 package io.github.thepun.fix.md;
 
 import io.github.thepun.fix.Fields;
+import io.github.thepun.fix.FixLogger;
 import io.github.thepun.fix.MsgTypes;
-import io.github.thepun.fix.md.domain.MDEntryGroup;
-import io.github.thepun.fix.md.domain.MarketDataSnapshotFullRefresh;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.DecoderException;
 
-final class MarketDataHandler extends ChannelDuplexHandler {
+final class ClientHandler extends ChannelDuplexHandler {
 
     private static final class Cursor {
         private ByteBuf in;
@@ -27,13 +25,18 @@ final class MarketDataHandler extends ChannelDuplexHandler {
     }
 
 
+    private final FixLogger fixLogger;
+    private final MarketDataSnapshotListener snapshotListener;
+    private final MarketDataConnectListener connectListener;
+    private final MarketDataDisconnectListener disconnectListener;
+
     private ByteBuf buffer;
 
-    @Override
-    public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
-        buffer = ctx.alloc().directBuffer(1024 * 1024);
-
-        super.channelRegistered(ctx);
+    ClientHandler(FixLogger fixLogger, MarketDataSnapshotListener snapshotListener, MarketDataConnectListener connectListener, MarketDataDisconnectListener disconnectListener) {
+        this.fixLogger = fixLogger;
+        this.snapshotListener = snapshotListener;
+        this.connectListener = connectListener;
+        this.disconnectListener = disconnectListener;
     }
 
     @Override
@@ -100,16 +103,20 @@ final class MarketDataHandler extends ChannelDuplexHandler {
                 // read message content
                 switch (msgType) {
                     case MsgTypes.MARKET_DATA_SNAPSHOT_FULL_REFRESH:
-                        MarketDataSnapshotFullRefresh fixMsg = MarketDataSnapshotFullRefresh.newInstance();
-                        fixMsg.setMessageBuffer(in);
-                        parseMarketDataSnapshotFullRefresh(cursor, fixMsg);
-                        ctx.fireChannelRead(fixMsg);
+                        MarketDataSnapshotFullRefresh snapshot = MarketDataSnapshotFullRefresh.newInstance();
+                        parseMarketDataSnapshotFullRefresh(cursor, snapshot);
+                        snapshot.setMessageBuffer(in);
+                        snapshotListener.onMarketData(snapshot);
                         break;
 
                     case MsgTypes.MARKET_DATA_REJECT:
+                        MarketDataReject reject = new MarketDataReject();
+                        parseMarketDataReject(cursor, reject);
                         break;
 
                     case MsgTypes.LOGOUT:
+
+                        ctx.close();
                         break;
 
                     case MsgTypes.LOGON:
@@ -175,6 +182,10 @@ final class MarketDataHandler extends ChannelDuplexHandler {
             parseDoubleValue(cursor);
             entry.setMdEntrySize(cursor.doubleValue);
         }
+    }
+
+    private static void parseMarketDataReject(Cursor cursor, MarketDataReject message) {
+
     }
 
     private static void parseTag(Cursor cursor) {

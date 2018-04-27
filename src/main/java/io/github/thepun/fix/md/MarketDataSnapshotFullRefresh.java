@@ -1,4 +1,4 @@
-package io.github.thepun.fix.md.domain;
+package io.github.thepun.fix.md;
 
 import io.github.thepun.unsafe.chars.OffHeapCharSequence;
 import io.netty.buffer.ByteBuf;

@@ -1,7 +1,7 @@
-package io.github.thepun.fix.common;
+package io.github.thepun.fix.md;
 
 
-public final class Logon {
+final class Logon {
 
   private String username;
   private String password;

@@ -25,20 +25,39 @@ final class DecodingUtil {
         }
     }
 
-    static void skipTagAndValue(DecodingCursor cursor) {
+    static void decodeTagAndSkipHeader(DecodingCursor cursor) {
         ByteBuf in = cursor.getBuffer();
         int count = cursor.getCount();
         int index = cursor.getIndex();
 
-        for (; index < count; index++) {
-            byte nextByte = in.getByte(index);
-            if (nextByte == DELIMITER) {
-                index++;
-                break;
-            }
-        }
+        int tagNum = 0;
 
-        cursor.setIndex(index);
+        for (;;) {
+            // read tag
+            for (; index < count; index++) {
+                byte nextByte = in.getByte(index);
+                if (nextByte == EQUAL_SIGN) {
+                    index++;
+                    break;
+                }
+
+                tagNum = tagNum * 10 + (nextByte - DIGIT_OFFSET);
+            }
+
+            // if one of headers continue skipping
+            if (tagNum == FixFields.SENDER_COMP_ID ||
+                    tagNum == FixFields.TARGET_COMP_ID ||
+                    tagNum == FixFields.SENDER_SUB_ID ||
+                    tagNum == FixFields.TARGET_SUB_ID ||
+                    tagNum == FixFields.MSG_SEQ_NUM ||
+                    tagNum == FixFields.SENDING_TIME) {
+                continue;
+            }
+
+            cursor.setTag(tagNum);
+            cursor.setIndex(index);
+            break;
+        }
     }
 
     /*static void revert(DecodingCursor cursor) {

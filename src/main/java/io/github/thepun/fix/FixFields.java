@@ -4,9 +4,15 @@ final class FixFields {
 
     public static final int BEGIN_STRING = 8;
     public static final int BODY_LENGTH = 9;
+    public static final int MSG_SEQ_NUM = 34;
     public static final int MSG_TYPE = 35;
+    public static final int SENDER_COMP_ID = 49;
+    public static final int SENDER_SUB_ID = 50;
+    public static final int SENDING_TIME = 52;
     public static final int SYMBOL = 55;
+    public static final int TARGET_SUB_ID = 57;
     public static final int TEXT = 58;
+    public static final int TARGET_COMP_ID = 59;
     public static final int ISSUER = 106;
     public static final int QUOTE_ID = 117;
     public static final int BID_SIZE = 134;

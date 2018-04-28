@@ -1,16 +1,15 @@
 package io.github.thepun.fix;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.Channel;
 
 final class SubscriptionSender implements MarketDataSubscriber {
 
-    private final ChannelHandlerContext ctx;
+    private final Channel channel;
 
     private volatile boolean enabled;
 
-    SubscriptionSender(ChannelHandlerContext ctx) {
-        this.ctx = ctx;
+    SubscriptionSender(Channel channel) {
+        this.channel = channel;
     }
 
     @Override
@@ -19,10 +18,7 @@ final class SubscriptionSender implements MarketDataSubscriber {
             throw new IllegalStateException("Subscriber is not active");
         }
 
-        ByteBuf buffer = ctx.alloc().directBuffer();
-        // TODO: write encoding for market data request
-
-        ctx.writeAndFlush(buffer, ctx.voidPromise());
+        channel.writeAndFlush(request, channel.voidPromise());
     }
 
     void disable() {

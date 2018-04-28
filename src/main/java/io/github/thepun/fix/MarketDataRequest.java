@@ -14,6 +14,7 @@ public final class MarketDataRequest {
     private RelatedSymGroup[] relatedSyms;
 
     private MarketDataRequest() {
+        relatedSyms = new RelatedSymGroup[0];
     }
 
     public String getMdReqId() {
@@ -48,8 +49,8 @@ public final class MarketDataRequest {
         this.streamReference = streamReference;
     }
 
-    public RelatedSymGroup[] getRelatedSyms() {
-        return relatedSyms;
+    public RelatedSymGroup getRelatedSym(int index) {
+        return relatedSyms[index];
     }
 
     public void setRelatedSymCount(int count) {

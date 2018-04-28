@@ -14,7 +14,7 @@ final class DecodingUtil {
         int readerIndex = buffer.readerIndex();
         cursor.setBuffer(buffer);
         cursor.setIndex(readerIndex);
-        cursor.setBefore(readerIndex);
+        //cursor.setBefore(readerIndex);
         cursor.setCount(buffer.readableBytes());
         cursor.setNativeAddress(buffer.memoryAddress());
     }
@@ -41,16 +41,16 @@ final class DecodingUtil {
         cursor.setIndex(index);
     }
 
-    static void revert(DecodingCursor cursor) {
+    /*static void revert(DecodingCursor cursor) {
         int before = cursor.getBefore();
         cursor.setIndex(before);
-    }
+    }*/
 
     static void decodeTag(DecodingCursor cursor) {
         ByteBuf in = cursor.getBuffer();
         int count = cursor.getCount();
         int index = cursor.getIndex();
-        cursor.setBefore(index);
+        //cursor.setBefore(index);
 
         int tagNum = 0;
         for (; index < count; index++) {
@@ -122,8 +122,8 @@ final class DecodingUtil {
 
         // value = int + float
         double value = intValue + floatValue / (double) floatSizePowered;
-        cursor.setDoubleValue(value);
         cursor.setIndex(index);
+        cursor.setDoubleValue(value);
     }
 
     static void decodeStrValue(DecodingCursor cursor) {

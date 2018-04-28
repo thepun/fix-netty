@@ -9,7 +9,7 @@ final class DecodingCursor {
     private ByteBuf buffer;
     private int count;
     private int index;
-    private int before;
+    //private int before;
     private int tag;
     private int intValue;
     private int strAsInt;
@@ -98,11 +98,11 @@ final class DecodingCursor {
         this.doubleValue = doubleValue;
     }
 
-    public int getBefore() {
+    /*int getBefore() {
         return before;
     }
 
-    public void setBefore(int before) {
+    void setBefore(int before) {
         this.before = before;
-    }
+    }*/
 }

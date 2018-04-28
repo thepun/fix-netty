@@ -1,5 +1,6 @@
 package io.github.thepun.fix;
 
+import io.github.thepun.unsafe.chars.OffHeapCharSequence;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
@@ -8,6 +9,61 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DecodingUtilTest {
+
+    @Test
+    void decodeTag() {
+        String fix = "2233=sdf|";
+
+        DecodingCursor cursor = prepareCursor(fix);
+        DecodingUtil.decodeTag(cursor);
+
+        assertEquals(2233, cursor.getTag());
+    }
+
+    @Test
+    void decodeInt() {
+        String fix = "5567=45678|";
+
+        DecodingCursor cursor = prepareCursor(fix);
+        DecodingUtil.decodeTag(cursor);
+        DecodingUtil.decodeIntValue(cursor);
+
+        assertEquals(45678, cursor.getIntValue());
+    }
+
+    @Test
+    void decodeString() {
+        String fix = "123=asdrty_sdf|";
+
+        DecodingCursor cursor = prepareCursor(fix);
+        DecodingUtil.decodeTag(cursor);
+        DecodingUtil.decodeStrValue(cursor);
+
+        OffHeapCharSequence str = new OffHeapCharSequence(cursor.getStrStart(), cursor.getStrLength());
+        assertEquals("asdrty_sdf", str.toString());
+    }
+
+    @Test
+    void decodeDoubleWithFloating() {
+        String fix = "567=123.012|";
+
+        DecodingCursor cursor = prepareCursor(fix);
+        DecodingUtil.decodeTag(cursor);
+        DecodingUtil.decodeDoubleValue(cursor);
+
+        assertEquals(123.012, cursor.getDoubleValue());
+    }
+
+    @Test
+    void decodeDoubleWithoutFloating() {
+        String fix = "111=778|";
+
+        DecodingCursor cursor = prepareCursor(fix);
+        DecodingUtil.decodeTag(cursor);
+        DecodingUtil.decodeDoubleValue(cursor);
+
+        assertEquals(778, cursor.getDoubleValue());
+    }
 
     @Test
     void massQuote() {

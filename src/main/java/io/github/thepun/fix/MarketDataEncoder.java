@@ -5,9 +5,9 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
 import io.netty.util.CharsetUtil;
 
-final class MarketDataEncoder extends MessageToByteEncoder<Object> {
+final class MarketDataEncoder /*extends MessageToByteEncoder<Object> */{
 
-    @Override
+   /* @Override
     public void encode(ChannelHandlerContext ctx, Object message, ByteBuf out) {
         if (message instanceof MarketDataSnapshotFullRefresh) {
 
@@ -94,5 +94,5 @@ final class MarketDataEncoder extends MessageToByteEncoder<Object> {
 
     private void encodeLogon(Logon logon) {
 
-    }
+    }*/
 }

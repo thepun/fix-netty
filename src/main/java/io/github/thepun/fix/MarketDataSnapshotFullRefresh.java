@@ -5,19 +5,9 @@ import io.netty.buffer.ByteBuf;
 import io.netty.util.AbstractReferenceCounted;
 import io.netty.util.Recycler;
 import io.netty.util.ReferenceCounted;
+import io.netty.util.internal.MathUtil;
 
 public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounted {
-
-    public static final int MD_UPDATE_ACTION_NEW = 0;
-    public static final int MD_UPDATE_ACTION_DELETE = 2;
-
-    public static final int MD_ENTRY_TYPE_BID = 0;
-    public static final int MD_ENTRY_TYPE_OFFER = 1;
-
-    public static final int QUOTE_CONDITION_OPEN_ACTIVE = (int) 'A';
-    public static final int QUOTE_CONDITION_CLOSED_INACTIVE = (int) 'B';
-    public static final int QUOTE_CONDITION_EXCHANGE_BEST = (int) 'C';
-    public static final int QUOTE_CONDITION_CONSOLIDATED_BEST = (int) 'D';
 
     private static final Recycler<MarketDataSnapshotFullRefresh> RECYCLER = new Recycler<MarketDataSnapshotFullRefresh>() {
         @Override
@@ -35,8 +25,9 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
     private final OffHeapCharSequence symbol;
     private final Recycler.Handle<MarketDataSnapshotFullRefresh> recyclerHandle;
 
-    private ByteBuf messageBuffer;
-    private MDEntryGroup[] entries;
+    private ByteBuf buffer;
+    private int entryCount;
+    private MDEntry[] entries;
 
     private MarketDataSnapshotFullRefresh(Recycler.Handle<MarketDataSnapshotFullRefresh> recyclerHandle) {
         this.recyclerHandle = recyclerHandle;
@@ -53,52 +44,55 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
         return symbol;
     }
 
-    public ByteBuf getMessageBuffer() {
-        return messageBuffer;
+    public ByteBuf getBuffer() {
+        return buffer;
     }
 
-    public void setMessageBuffer(ByteBuf messageBuffer) {
-        messageBuffer.retain();
-        this.messageBuffer = messageBuffer;
+    public MDEntry getEntry(int index) {
+        return entries[index];
     }
 
-    public MDEntryGroup[] getEntries() {
-        return entries;
+    public int getEntryCount() {
+        return entryCount;
     }
 
-    public void setEntryCount(int count) {
-        if (entries.length < count) {
-            MDEntryGroup[] newEntries = new MDEntryGroup[count];
+    void initBuffer(ByteBuf buffer) {
+        buffer.retain();
+        this.buffer = buffer;
+    }
+
+    void initEntries(int entryCount) {
+        this.entryCount = entryCount;
+
+        // ensure we have enough data
+        if (entries.length < entryCount) {
+            MDEntry[] newEntries = new MDEntry[MathUtil.safeFindNextPositivePowerOfTwo(entryCount)];
             System.arraycopy(entries, 0, newEntries, 0, entries.length);
 
-            for (int i = entries.length; i < count; i++) {
-                newEntries[i] = new MDEntryGroup();
+            for (int i = entries.length; i < newEntries.length; i++) {
+                newEntries[i] = new MDEntry();
             }
 
             entries = newEntries;
         }
     }
 
-    public MDEntryGroup getEntry(int index) {
-        return entries[index];
-    }
-
     @Override
     public ReferenceCounted touch(Object hint) {
-        messageBuffer.touch(hint);
+        buffer.touch(hint);
         return this;
     }
 
     @Override
     protected void deallocate() {
-        messageBuffer.release();
-        messageBuffer = null;
+        buffer.release();
+        buffer = null;
 
         recyclerHandle.recycle(this);
     }
 
 
-    public static final class MDEntryGroup {
+    public static final class MDEntry {
 
         private final OffHeapCharSequence id;
         private final OffHeapCharSequence symbol;
@@ -110,7 +104,7 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
         private double mdEntrySize;
         private int quoteCondition;
 
-        private MDEntryGroup() {
+        private MDEntry() {
             id = new OffHeapCharSequence();
             symbol = new OffHeapCharSequence();
             currency = new OffHeapCharSequence();

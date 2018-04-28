@@ -1,6 +1,6 @@
 package io.github.thepun.fix;
 
-final class MsgTypes {
+final class FixMsgTypes {
 
     public static final int LOGON = (int) 'A';
     public static final int LOGOUT = (int) 'S';

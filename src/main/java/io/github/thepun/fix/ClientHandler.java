@@ -4,7 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 
-import static io.github.thepun.fix.FixDecodingUtils.*;
+import static io.github.thepun.fix.DecodingUtil.*;
 
 final class ClientHandler extends ChannelInboundHandlerAdapter {
 
@@ -15,14 +15,16 @@ final class ClientHandler extends ChannelInboundHandlerAdapter {
     private final FixLogger fixLogger;
     private final MarketDataReadyListener readyListener;
     private final MarketDataQuotesListener quotesListener;
+    private final MarketDataSnapshotListener snapshotListener;
 
     private ByteBuf buffer;
     private String sessionName;
 
-    ClientHandler(FixLogger fixLogger, MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener) {
+    ClientHandler(FixLogger fixLogger, MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener, MarketDataSnapshotListener snapshotListener) {
         this.fixLogger = fixLogger;
         this.readyListener = readyListener;
         this.quotesListener = quotesListener;
+        this.snapshotListener = snapshotListener;
 
         logon = new Logon();
         logout = new Logout();
@@ -63,10 +65,8 @@ final class ClientHandler extends ChannelInboundHandlerAdapter {
         int msgType;
 
         // prepare cursor object
-        FixDecodingCursor cursor = new FixDecodingCursor();
-        cursor.setIn(in);
-        cursor.setIndex(in.readerIndex());
-        cursor.setCount(in.readableBytes());
+        DecodingCursor cursor = new DecodingCursor();
+        start(cursor, in);
 
         // read until the end
         while (cursor.getIndex() < cursor.getCount()) {
@@ -75,12 +75,12 @@ final class ClientHandler extends ChannelInboundHandlerAdapter {
 
             // read fix
             decodeTag(cursor);
-            ensureTag(cursor, Fields.BEGIN_STRING);
+            ensureTag(cursor, FixFields.BEGIN_STRING);
             cursor.setIndex(cursor.getIndex() + 8);
 
             // read length
             decodeTag(cursor);
-            ensureTag(cursor, Fields.BODY_LENGTH);
+            ensureTag(cursor, FixFields.BODY_LENGTH);
             decodeIntValue(cursor);
             length = cursor.getIntValue();
 
@@ -100,7 +100,7 @@ final class ClientHandler extends ChannelInboundHandlerAdapter {
 
             // read message type
             decodeTag(cursor);
-            ensureTag(cursor, Fields.MSG_TYPE);
+            ensureTag(cursor, FixFields.MSG_TYPE);
             decodeStrValueAsInt(cursor);
             msgType = cursor.getStrAsInt();
 
@@ -111,26 +111,25 @@ final class ClientHandler extends ChannelInboundHandlerAdapter {
 
             // read message content
             switch (msgType) {
-                case MsgTypes.MASS_QUOTE:
+                case FixMsgTypes.MASS_QUOTE:
                     MassQuote quotes = MassQuote.newInstance();
                     decodeMassQuote(cursor, quotes);
                     //quotes.setMessageBuffer(in);
                     quotesListener.onMarketData(quotes);
                     break;
 
-                /*case MsgTypes.MARKET_DATA_SNAPSHOT_FULL_REFRESH:
+                case FixMsgTypes.MARKET_DATA_SNAPSHOT_FULL_REFRESH:
                     MarketDataSnapshotFullRefresh snapshot = MarketDataSnapshotFullRefresh.newInstance();
                     decodeMarketDataSnapshotFullRefresh(cursor, snapshot);
-                    snapshot.setMessageBuffer(in);
                     snapshotListener.onMarketData(snapshot);
-                    break;*/
+                    break;
 
-                case MsgTypes.MARKET_DATA_REJECT:
+                case FixMsgTypes.MARKET_DATA_REJECT:
                     decodeMarketDataReject(cursor, reject);
                     fixLogger.status("Market data request with id " + reject.getMdReqID() + " in session " + sessionName + " was rejected: " + reject.getText());
                     break;
 
-                case MsgTypes.LOGON:
+                case FixMsgTypes.LOGON:
                     decodeLogon(cursor, logon);
                     fixLogger.status("Logon in session " + sessionName);
                     SubscriptionSender subscriptionSender = new SubscriptionSender(ctx);
@@ -138,7 +137,7 @@ final class ClientHandler extends ChannelInboundHandlerAdapter {
                     subscriptionSender.disable();
                     break;
 
-                case MsgTypes.LOGOUT:
+                case FixMsgTypes.LOGOUT:
                     decodeLogout(cursor, logout);
                     fixLogger.status("Logout in session " + sessionName);
                     ctx.close();

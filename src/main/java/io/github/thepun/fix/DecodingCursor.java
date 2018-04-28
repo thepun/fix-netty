@@ -4,11 +4,12 @@ import io.netty.buffer.ByteBuf;
 import sun.misc.Contended;
 
 @Contended
-final class FixDecodingCursor {
+final class DecodingCursor {
 
-    private ByteBuf in;
+    private ByteBuf buffer;
     private int count;
     private int index;
+    private int before;
     private int tag;
     private int intValue;
     private int strAsInt;
@@ -17,12 +18,12 @@ final class FixDecodingCursor {
     private long nativeAddress;
     private double doubleValue;
 
-    ByteBuf getIn() {
-        return in;
+    ByteBuf getBuffer() {
+        return buffer;
     }
 
-    void setIn(ByteBuf in) {
-        this.in = in;
+    void setBuffer(ByteBuf buffer) {
+        this.buffer = buffer;
     }
 
     int getCount() {
@@ -95,5 +96,13 @@ final class FixDecodingCursor {
 
     void setDoubleValue(double doubleValue) {
         this.doubleValue = doubleValue;
+    }
+
+    public int getBefore() {
+        return before;
+    }
+
+    public void setBefore(int before) {
+        this.before = before;
     }
 }

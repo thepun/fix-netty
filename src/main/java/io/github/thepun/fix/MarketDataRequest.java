@@ -1,12 +1,20 @@
 package io.github.thepun.fix;
 
-final class MarketDataRequest {
+public final class MarketDataRequest {
+
+    public static MarketDataRequest newInstance() {
+        return new MarketDataRequest();
+    }
+
 
     private String mdReqId;
     private int subscriptionRequestType;
     private int marketDepth;
     private String streamReference;
     private RelatedSymGroup[] relatedSyms;
+
+    private MarketDataRequest() {
+    }
 
     public String getMdReqId() {
         return mdReqId;

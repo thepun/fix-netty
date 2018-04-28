@@ -14,7 +14,7 @@ final class SubscriptionSender implements MarketDataSubscriber {
     }
 
     @Override
-    public void subscribe(String id, String symbol, int marketDepth) {
+    public void subscribe(MarketDataRequest request) {
         if (!enabled) {
             throw new IllegalStateException("Subscriber is not active");
         }

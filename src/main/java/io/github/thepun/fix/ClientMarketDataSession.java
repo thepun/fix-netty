@@ -9,7 +9,7 @@ import io.netty.util.concurrent.Future;
 
 import java.util.concurrent.TimeUnit;
 
-public final class MarketDataSession {
+public final class ClientMarketDataSession {
 
     public static MarketDataSessionBuilder newBuilder() {
         return new MarketDataSessionBuilder();
@@ -28,8 +28,8 @@ public final class MarketDataSession {
     private boolean active;
     private Channel lastChannel;
 
-    MarketDataSession(MarketDataSnapshotListener snapshotListener, MarketDataReadyListener readyListener, FixConnectListener connectListener,
-                      FixDisconnectListener disconnectListener, NioEventLoopGroup executor, String host, int port, int reconnectInterval, FixLogger fixLogger) {
+    ClientMarketDataSession(NioEventLoopGroup executor, FixLogger fixLogger, MarketDataQuotesListener quotesListener, MarketDataSnapshotListener snapshotListener,
+                            MarketDataReadyListener readyListener, FixConnectListener connectListener, FixDisconnectListener disconnectListener, String host, int port, int reconnectInterval) {
         this.connectListener = connectListener;
         this.disconnectListener = disconnectListener;
         this.reconnectInterval = reconnectInterval;
@@ -38,7 +38,7 @@ public final class MarketDataSession {
         this.host = host;
         this.port = port;
 
-        initializer = new ClientInitializer(fixLogger, readyListener, snapshotListener);
+        initializer = new ClientInitializer(fixLogger, readyListener, quotesListener, snapshotListener);
     }
 
     public synchronized void start() {

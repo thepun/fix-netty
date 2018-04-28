@@ -9,10 +9,11 @@ public final class MarketDataSessionBuilder {
     private String host;
     private int port;
     private int reconnectInterval;
-    private MarketDataSnapshotListener snapshotListener;
-    private MarketDataReadyListener readyListener;
     private FixConnectListener connectListener;
     private FixDisconnectListener disconnectListener;
+    private MarketDataReadyListener readyListener;
+    private MarketDataQuotesListener quotesListener;
+    private MarketDataSnapshotListener snapshotListener;
 
     MarketDataSessionBuilder() {
         host = "localhost";
@@ -20,76 +21,92 @@ public final class MarketDataSessionBuilder {
         reconnectInterval = 1000;
     }
 
-    public MarketDataSessionBuilder setExecutor(NioEventLoopGroup executor) {
+    public MarketDataSessionBuilder executor(NioEventLoopGroup executor) {
         this.executor = executor;
         return this;
     }
 
-    public MarketDataSessionBuilder setFixLogger(FixLogger fixLogger) {
+    public MarketDataSessionBuilder logger(FixLogger fixLogger) {
         this.fixLogger = fixLogger;
         return this;
     }
 
-    public MarketDataSessionBuilder setHost(String host) {
+    public MarketDataSessionBuilder host(String host) {
         this.host = host;
         return this;
     }
 
-    public MarketDataSessionBuilder setPort(int port) {
+    public MarketDataSessionBuilder port(int port) {
         this.port = port;
         return this;
     }
 
-    public MarketDataSessionBuilder setReconnectInterval(int reconnectInterval) {
+    public MarketDataSessionBuilder reconnectInterval(int reconnectInterval) {
         this.reconnectInterval = reconnectInterval;
         return this;
     }
 
-    public MarketDataSessionBuilder setSnapshotListener(MarketDataSnapshotListener snapshotListener) {
+    public MarketDataSessionBuilder quotesListener(MarketDataQuotesListener quotesListener) {
+        this.quotesListener = quotesListener;
+        return this;
+    }
+
+    public MarketDataSessionBuilder snapshotListener(MarketDataSnapshotListener snapshotListener) {
         this.snapshotListener = snapshotListener;
         return this;
     }
 
-    public MarketDataSessionBuilder setReadyListener(MarketDataReadyListener readyListener) {
+    public MarketDataSessionBuilder readyListener(MarketDataReadyListener readyListener) {
         this.readyListener = readyListener;
         return this;
     }
 
-    public MarketDataSessionBuilder setConnectListener(FixConnectListener connectListener) {
+    public MarketDataSessionBuilder connectListener(FixConnectListener connectListener) {
         this.connectListener = connectListener;
         return this;
     }
 
-    public MarketDataSessionBuilder setDisconnectListener(FixDisconnectListener disconnectListener) {
+    public MarketDataSessionBuilder disconnectListener(FixDisconnectListener disconnectListener) {
         this.disconnectListener = disconnectListener;
         return this;
     }
 
-    public MarketDataSession build() {
-        if (snapshotListener == null) {
-            snapshotListener = DummyListener.INSTANCE;
+    public ClientMarketDataSession client() {
+        MarketDataQuotesListener localQuotesListener = quotesListener;
+        if (localQuotesListener == null) {
+            localQuotesListener = e -> {};
         }
 
-        if (readyListener == null) {
-            readyListener = DummyListener.INSTANCE;
+        MarketDataSnapshotListener localSnapshotListener = snapshotListener;
+        if (localSnapshotListener == null) {
+            localSnapshotListener = e -> {};
         }
 
-        if (connectListener == null) {
-            connectListener = DummyListener.INSTANCE;
+        MarketDataReadyListener localReadyListener = readyListener;
+        if (localReadyListener == null) {
+            localReadyListener = e -> {};
         }
 
-        if (disconnectListener == null) {
-            disconnectListener = DummyListener.INSTANCE;
+        FixConnectListener localConnectListener = connectListener;
+        if (localConnectListener == null) {
+            localConnectListener = () -> {};
         }
 
-        if (fixLogger == null) {
-            fixLogger = DummyListener.INSTANCE;
+        FixDisconnectListener localDisconnectListener = disconnectListener;
+        if (localDisconnectListener == null) {
+            localDisconnectListener = () -> {};
         }
 
-        if (executor == null) {
-            executor = new NioEventLoopGroup(1);
+        FixLogger localFixLogger = fixLogger;
+        if (localFixLogger == null) {
+            localFixLogger = NoOpFixLogger.INSTANCE;
         }
 
-        return new MarketDataSession(snapshotListener, readyListener, connectListener, disconnectListener, executor, host, port, reconnectInterval, fixLogger);
+        NioEventLoopGroup localExecutor = executor;
+        if (localExecutor == null) {
+            localExecutor = new NioEventLoopGroup(1);
+        }
+
+        return new ClientMarketDataSession(localExecutor, localFixLogger, localQuotesListener, localSnapshotListener, localReadyListener, localConnectListener, localDisconnectListener, host, port, reconnectInterval);
     }
 }

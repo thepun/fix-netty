@@ -14,7 +14,7 @@ class DecodingUtilTest {
     void decodeTag() {
         String fix = "2233=sdf|";
 
-        DecodingCursor cursor = prepareCursor(fix);
+        Cursor cursor = prepareCursor(fix);
         DecodingUtil.decodeTag(cursor);
 
         assertEquals(2233, cursor.getTag());
@@ -24,7 +24,7 @@ class DecodingUtilTest {
     void decodeInt() {
         String fix = "5567=45678|";
 
-        DecodingCursor cursor = prepareCursor(fix);
+        Cursor cursor = prepareCursor(fix);
         DecodingUtil.decodeTag(cursor);
         DecodingUtil.decodeIntValue(cursor);
 
@@ -35,7 +35,7 @@ class DecodingUtilTest {
     void decodeString() {
         String fix = "123=asdrty_sdf|";
 
-        DecodingCursor cursor = prepareCursor(fix);
+        Cursor cursor = prepareCursor(fix);
         DecodingUtil.decodeTag(cursor);
         DecodingUtil.decodeStrValue(cursor);
 
@@ -47,7 +47,7 @@ class DecodingUtilTest {
     void decodeDoubleWithFloating() {
         String fix = "567=123.012|";
 
-        DecodingCursor cursor = prepareCursor(fix);
+        Cursor cursor = prepareCursor(fix);
         DecodingUtil.decodeTag(cursor);
         DecodingUtil.decodeDoubleValue(cursor);
 
@@ -58,7 +58,7 @@ class DecodingUtilTest {
     void decodeDoubleWithoutFloating() {
         String fix = "111=778|";
 
-        DecodingCursor cursor = prepareCursor(fix);
+        Cursor cursor = prepareCursor(fix);
         DecodingUtil.decodeTag(cursor);
         DecodingUtil.decodeDoubleValue(cursor);
 
@@ -90,10 +90,10 @@ class DecodingUtilTest {
         assertEquals(186.14, quoteSetEntry.getOfferSpotRate());
     }
 
-    private static DecodingCursor prepareCursor(String fix) {
+    private static Cursor prepareCursor(String fix) {
         ByteBuf buffer = Unpooled.directBuffer(fix.length());
         buffer.writeBytes(fix.replace('|', (char) 1).getBytes(CharsetUtil.US_ASCII));
-        DecodingCursor cursor = new DecodingCursor();
+        Cursor cursor = new Cursor();
         DecodingUtil.start(cursor, buffer);
         return cursor;
     }

@@ -10,24 +10,24 @@ final class DecodingUtil {
     private static final int DIGIT_OFFSET = (int) '0';
     private static final int FLOAT_PART_SIGN = (int) '.';
 
-    static void start(DecodingCursor cursor, ByteBuf buffer) {
+    static void start(Cursor cursor, ByteBuf buffer) {
         int readerIndex = buffer.readerIndex();
         cursor.setBuffer(buffer);
         cursor.setIndex(readerIndex);
         //cursor.setBefore(readerIndex);
-        cursor.setCount(buffer.readableBytes());
+        cursor.setPoint(buffer.readableBytes());
         cursor.setNativeAddress(buffer.memoryAddress());
     }
 
-    static void ensureTag(DecodingCursor cursor, int tag) {
+    static void ensureTag(Cursor cursor, int tag) {
         if (cursor.getTag() != tag) {
             throw new DecoderException("Expected tag " + tag);
         }
     }
 
-    static void decodeTagAndSkipHeader(DecodingCursor cursor) {
+    static void decodeTagAndSkipHeader(Cursor cursor) {
         ByteBuf in = cursor.getBuffer();
-        int count = cursor.getCount();
+        int count = cursor.getPoint();
         int index = cursor.getIndex();
 
         int tagNum = 0;
@@ -65,9 +65,9 @@ final class DecodingUtil {
         cursor.setIndex(before);
     }*/
 
-    static void decodeTag(DecodingCursor cursor) {
+    static void decodeTag(Cursor cursor) {
         ByteBuf in = cursor.getBuffer();
-        int count = cursor.getCount();
+        int count = cursor.getPoint();
         int index = cursor.getIndex();
         //cursor.setBefore(index);
 
@@ -86,9 +86,9 @@ final class DecodingUtil {
         cursor.setIndex(index);
     }
 
-    static void decodeIntValue(DecodingCursor cursor) {
+    static void decodeIntValue(Cursor cursor) {
         ByteBuf in = cursor.getBuffer();
-        int count = cursor.getCount();
+        int count = cursor.getPoint();
         int index = cursor.getIndex();
 
         int value = 0;
@@ -106,9 +106,9 @@ final class DecodingUtil {
         cursor.setIndex(index);
     }
 
-    static void decodeDoubleValue(DecodingCursor cursor) {
+    static void decodeDoubleValue(Cursor cursor) {
         ByteBuf in = cursor.getBuffer();
-        int count = cursor.getCount();
+        int count = cursor.getPoint();
         int index = cursor.getIndex();
 
         // calculate integer part
@@ -145,9 +145,9 @@ final class DecodingUtil {
         cursor.setDoubleValue(value);
     }
 
-    static void decodeStrValue(DecodingCursor cursor) {
+    static void decodeStrValue(Cursor cursor) {
         ByteBuf in = cursor.getBuffer();
-        int count = cursor.getCount();
+        int count = cursor.getPoint();
         int index = cursor.getIndex();
         long start = cursor.getNativeAddress() + index;
 
@@ -167,9 +167,9 @@ final class DecodingUtil {
         cursor.setIndex(index);
     }
 
-    static void decodeStrValueAsInt(DecodingCursor cursor) {
+    static void decodeStrValueAsInt(Cursor cursor) {
         ByteBuf in = cursor.getBuffer();
-        int count = cursor.getCount();
+        int count = cursor.getPoint();
         int index = cursor.getIndex();
 
         int value = 0;
@@ -187,15 +187,15 @@ final class DecodingUtil {
         cursor.setIndex(index);
     }
 
-    static void decodeLogon(DecodingCursor cursor, Logon logon) {
+    static void decodeLogon(Cursor cursor, Logon logon) {
 
     }
 
-    static void decodeLogout(DecodingCursor cursor, Logout logout) {
+    static void decodeLogout(Cursor cursor, Logout logout) {
 
     }
 
-    static void decodeMarketDataSnapshotFullRefresh(DecodingCursor cursor, MarketDataSnapshotFullRefresh message) {
+    static void decodeMarketDataSnapshotFullRefresh(Cursor cursor, MarketDataSnapshotFullRefresh message) {
         message.initBuffer(cursor.getBuffer());
 
         // req id
@@ -247,7 +247,7 @@ final class DecodingUtil {
         }
     }
 
-    static void decodeMassQuote(DecodingCursor cursor, MassQuote message) {
+    static void decodeMassQuote(Cursor cursor, MassQuote message) {
         message.initBuffer(cursor.getBuffer());
 
         // one tag in future
@@ -348,7 +348,7 @@ final class DecodingUtil {
         }
     }
 
-    static void decodeMarketDataReject(DecodingCursor cursor, MarketDataRequestReject message) {
+    static void decodeMarketDataReject(Cursor cursor, MarketDataRequestReject message) {
         // req id
         decodeTag(cursor);
         ensureTag(cursor, FixFields.MD_REQ_ID);

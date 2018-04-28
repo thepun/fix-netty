@@ -4,15 +4,14 @@ import io.netty.buffer.ByteBuf;
 import sun.misc.Contended;
 
 @Contended
-final class DecodingCursor {
+final class Cursor {
 
     private ByteBuf buffer;
-    private int count;
+    private int point;
     private int index;
     //private int before;
     private int tag;
     private int intValue;
-    private int strAsInt;
     private long strStart;
     private int strLength;
     private long nativeAddress;
@@ -26,12 +25,12 @@ final class DecodingCursor {
         this.buffer = buffer;
     }
 
-    int getCount() {
-        return count;
+    int getPoint() {
+        return point;
     }
 
-    void setCount(int count) {
-        this.count = count;
+    void setPoint(int point) {
+        this.point = point;
     }
 
     int getIndex() {
@@ -56,14 +55,6 @@ final class DecodingCursor {
 
     void setIntValue(int intValue) {
         this.intValue = intValue;
-    }
-
-    int getStrAsInt() {
-        return strAsInt;
-    }
-
-    void setStrAsInt(int strAsInt) {
-        this.strAsInt = strAsInt;
     }
 
     long getStrStart() {

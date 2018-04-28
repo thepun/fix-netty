@@ -5,7 +5,6 @@ import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.CharsetUtil;
-import io.netty.util.internal.StringUtil;
 
 import static io.github.thepun.fix.DecodingUtil.*;
 
@@ -113,12 +112,12 @@ final class ClientHandler extends ChannelDuplexHandler {
         }
 
         // prepare cursor object
-        DecodingCursor cursor = new DecodingCursor();
+        Cursor cursor = new Cursor();
         start(cursor, in);
 
         // read until the end
         index = cursor.getIndex();
-        while (index < cursor.getCount()) {
+        while (index < cursor.getPoint()) {
             // remember message start
             start = index;
 
@@ -135,7 +134,7 @@ final class ClientHandler extends ChannelDuplexHandler {
             length += 7; // include checksum
 
             // check we have enough bytes
-            if (cursor.getIndex() + length >= cursor.getCount()) {
+            if (cursor.getIndex() + length >= cursor.getPoint()) {
                 buffer = in;
                 return;
             }

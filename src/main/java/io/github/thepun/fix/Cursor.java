@@ -16,6 +16,7 @@ final class Cursor {
     private int strLength;
     private long nativeAddress;
     private double doubleValue;
+    private byte[] temp;
 
     ByteBuf getBuffer() {
         return buffer;
@@ -88,6 +89,16 @@ final class Cursor {
     void setDoubleValue(double doubleValue) {
         this.doubleValue = doubleValue;
     }
+
+    byte[] getTemp() {
+        return temp;
+    }
+
+    void setTemp(byte[] temp) {
+        this.temp = temp;
+    }
+
+
 
     /*int getBefore() {
         return before;

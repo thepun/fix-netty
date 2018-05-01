@@ -3,6 +3,7 @@ package io.github.thepun.fix;
 import io.netty.buffer.ByteBuf;
 import sun.misc.Contended;
 
+// TODO: inline
 @Contended
 final class Cursor {
 

@@ -3,6 +3,7 @@ package io.github.thepun.fix;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.DecoderException;
 
+// TODO: inline cursor
 final class DecodingUtil {
 
     private static final int DELIMITER = 1;

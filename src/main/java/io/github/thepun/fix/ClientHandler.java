@@ -6,9 +6,15 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.CharsetUtil;
 
+import java.util.Objects;
+
 import static io.github.thepun.fix.DecodingUtil.*;
+import static io.github.thepun.fix.EncodingUtil.*;
 
 final class ClientHandler extends ChannelDuplexHandler {
+
+    private static final int BEGIN_HEADER_LENGTH = 10;
+
 
     private final Logon logon;
     private final Logout logout;
@@ -21,9 +27,13 @@ final class ClientHandler extends ChannelDuplexHandler {
     private final MarketDataSnapshotListener snapshotListener;
 
     private ByteBuf buffer;
-    private ByteBuf bginHeader;
     private ByteBuf sessionHeader;
+    private ByteBuf beginHeader;
+    private ByteBuf bodyLengthHeader;
     private String sessionName;
+
+    private int sequenceNumber;
+    private int sessionHeaderLength;
 
     ClientHandler(FixSessionInfo sessionInfo, FixLogger fixLogger, MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener, MarketDataSnapshotListener snapshotListener) {
         this.fixLogger = fixLogger;
@@ -39,11 +49,16 @@ final class ClientHandler extends ChannelDuplexHandler {
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-        // begin string buffer is alwas the same
+        // begin string buffer is always the same
         ByteBuf newBeginHeader = ctx.alloc().directBuffer();
         newBeginHeader.writeCharSequence("8=FIX.4.4", CharsetUtil.US_ASCII);
         newBeginHeader.writeByte(1);
-        bginHeader = newBeginHeader;
+        beginHeader = newBeginHeader;
+
+        // body length prefix
+        ByteBuf newBodyLengthHeader = ctx.alloc().directBuffer();
+        newBodyLengthHeader.writeCharSequence("9=", CharsetUtil.US_ASCII);
+        bodyLengthHeader = newBeginHeader;
 
         // session header is also always the same
         ByteBuf newSessionHeader = ctx.alloc().directBuffer();
@@ -60,14 +75,15 @@ final class ClientHandler extends ChannelDuplexHandler {
             newSessionHeader.writeByte(1);
         }
         sessionHeader = newSessionHeader;
+        sessionHeaderLength = newSessionHeader.readableBytes();
 
         super.handlerAdded(ctx);
     }
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        bginHeader.release();
-        bginHeader = null;
+        beginHeader.release();
+        beginHeader = null;
 
         sessionHeader.release();
         sessionHeader = null;
@@ -78,7 +94,19 @@ final class ClientHandler extends ChannelDuplexHandler {
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         sessionName = ctx.channel().toString();
+
         super.channelActive(ctx);
+
+        fixLogger.status("Sending logon in session " + sessionName);
+
+        // send logon
+        Logon logon = new Logon();
+        logon.setEncryptMethod(0);
+        logon.setHeartbeatInterval(10);
+        logon.setResetSqNumFlag(true);
+        logon.setUsername(sessionInfo.getUsername());
+        logon.setPassword(sessionInfo.getPassword());
+        write(ctx, logon, ctx.voidPromise());
     }
 
     @Override
@@ -113,7 +141,7 @@ final class ClientHandler extends ChannelDuplexHandler {
 
         // prepare cursor object
         Cursor cursor = new Cursor();
-        start(cursor, in);
+        startDecoding(cursor, in);
 
         // read until the end
         index = cursor.getIndex();
@@ -145,8 +173,8 @@ final class ClientHandler extends ChannelDuplexHandler {
             // read message type
             decodeTag(cursor);
             ensureTag(cursor, FixFields.MSG_TYPE);
-            decodeStrValueAsInt(cursor);
-            msgType = cursor.getStrAsInt();
+            decodeStringValueAsInt(cursor);
+            msgType = cursor.getIntValue();
 
             // skip rest header fields
             decodeTagAndSkipHeader(cursor);
@@ -172,7 +200,7 @@ final class ClientHandler extends ChannelDuplexHandler {
 
                 case FixMsgTypes.LOGON:
                     decodeLogon(cursor, logon);
-                    fixLogger.status("Logon in session " + sessionName);
+                    fixLogger.status("Received logon in session " + sessionName);
                     SubscriptionSender subscriptionSender = new SubscriptionSender(ctx.channel());
                     readyListener.onReady(subscriptionSender);
                     subscriptionSender.disable();
@@ -180,7 +208,7 @@ final class ClientHandler extends ChannelDuplexHandler {
 
                 case FixMsgTypes.LOGOUT:
                     decodeLogout(cursor, logout);
-                    fixLogger.status("Logout in session " + sessionName);
+                    fixLogger.status("Received logout in session " + sessionName);
                     ctx.close();
                     break;
 
@@ -200,26 +228,88 @@ final class ClientHandler extends ChannelDuplexHandler {
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+        int index;
+
+        // write begin string + body length mock
+        ByteBuf headerBuf = ctx.alloc().directBuffer();
+        beginHeader.getBytes(0, headerBuf);
+        bodyLengthHeader.getBytes(BEGIN_HEADER_LENGTH, headerBuf);
+
+        // prepare cursor
         ByteBuf msgByteBuf = ctx.alloc().directBuffer();
+        Cursor cursor = new Cursor();
+        startEncoding(cursor, msgByteBuf);
+        int start = cursor.getIndex();
 
-        // write begin string
-        bginHeader.getBytes(0, msgByteBuf);
+        // write msg type
+        cursor.setTag(FixFields.MSG_TYPE);
+        encodeTag(cursor);
+        int msgTypeIndex = cursor.getIndex();
+        cursor.setIndex(msgTypeIndex + 2);
+        msgByteBuf.setByte(msgTypeIndex + 1, 1);
 
-        // TODO: write body length mock
+        // write sequence number
+        cursor.setTag(FixFields.MSG_SEQ_NUM);
+        cursor.setIntValue(sequenceNumber);
+        encodeTag(cursor);
+        encodeIntValue(cursor);
+        sequenceNumber++;
 
-        // TODO: write msg type
+        // write session info
+        index = cursor.getIndex();
+        sessionHeader.getBytes(index, msgByteBuf);
+        cursor.setIndex(index + sessionHeaderLength);
 
+        // write body
         if (msg instanceof MarketDataRequest) {
+            msgByteBuf.setByte(msgTypeIndex, FixMsgTypes.MARKET_DATA_REQUEST);
+
             MarketDataRequest marketDataRequest = (MarketDataRequest) msg;
-            // TODO: do encoding
+            encodeMarketDataRequest(cursor, marketDataRequest);
+        } else if (msg instanceof Logon) {
+            msgByteBuf.setByte(msgTypeIndex, FixMsgTypes.LOGON);
+
+            Logon logon = (Logon) msg;
+            encodeLogon(cursor, logon);
         } else {
             fixLogger.status("Unknown message: " + msg.getClass().getName());
         }
 
-        // TODO: write body length
+        // remember body length and calculate checksum
+        index = cursor.getIndex();
+        int bodyLength = index - start;
+        int sum = 0;
+        for (int i = start; i < index; i++) {
+            byte b = msgByteBuf.getByte(i);
+            sum += b;
+        }
+        sum %= 256;
 
-        // TODO: write checksum
+        // write checksum and finish
+        cursor.setTag(FixFields.CHECK_SUM);
+        cursor.setIntValue(sum);
+        encodeTag(cursor);
+        index = cursor.getIndex();
+        index = encodeThreeDigitInt(msgByteBuf, index, sum);
+        index = encodeDelimiter(msgByteBuf, index);
+        msgByteBuf.writerIndex(index);
 
+        // write actual body length
+        startEncoding(cursor, headerBuf);
+        cursor.setIntValue(bodyLength);
+        encodeIntValue(cursor);
+
+        // remember indexes and send to channel
+        int firstOffset = headerBuf.readerIndex();
+        int firstLength = headerBuf.readableBytes();
+        ctx.write(headerBuf, promise);
+        int secondOffset = msgByteBuf.readerIndex();
+        int secondLength = msgByteBuf.readableBytes();
         ctx.writeAndFlush(msgByteBuf, promise);
+
+        // log outgoing message
+        fixLogger.outgoing(headerBuf, firstOffset, firstLength, msgByteBuf, secondOffset, secondLength);
     }
+
+
 }

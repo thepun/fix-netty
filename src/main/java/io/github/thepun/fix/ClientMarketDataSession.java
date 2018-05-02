@@ -28,7 +28,7 @@ public final class ClientMarketDataSession {
     private boolean active;
     private Channel lastChannel;
 
-    ClientMarketDataSession(NioEventLoopGroup executor, FixLogger fixLogger, MarketDataQuotesListener quotesListener, MarketDataSnapshotListener snapshotListener,
+    ClientMarketDataSession(NioEventLoopGroup executor, FixSessionInfo fixSessionInfo, FixLogger fixLogger, MarketDataQuotesListener quotesListener, MarketDataSnapshotListener snapshotListener,
                             MarketDataReadyListener readyListener, FixConnectListener connectListener, FixDisconnectListener disconnectListener, String host, int port, int reconnectInterval) {
         this.connectListener = connectListener;
         this.disconnectListener = disconnectListener;
@@ -38,7 +38,7 @@ public final class ClientMarketDataSession {
         this.host = host;
         this.port = port;
 
-        initializer = new ClientInitializer(fixLogger, readyListener, quotesListener, snapshotListener);
+        initializer = new ClientInitializer(fixSessionInfo, fixLogger, readyListener, quotesListener, snapshotListener);
     }
 
     public synchronized void start() {
@@ -93,7 +93,10 @@ public final class ClientMarketDataSession {
         if (active) {
             fixLogger.status("Scheduling reconnect to " + host + ":" + port);
             executor.schedule(this::reconnect, reconnectInterval, TimeUnit.MILLISECONDS);
-            disconnectListener.onDisconnect();
+
+            if (disconnectListener != null) {
+                disconnectListener.onDisconnect();
+            }
         }
     }
 
@@ -101,7 +104,10 @@ public final class ClientMarketDataSession {
         if (active) {
             if (f.isSuccess()) {
                 fixLogger.status("Connection to " + host + ":" + port + " opened");
-                connectListener.onConnnect();
+
+                if (connectListener != null) {
+                    connectListener.onConnnect();
+                }
             } else {
                 fixLogger.status("Connection to " + host + ":" + port + " failed: " + f.cause().getMessage());
             }

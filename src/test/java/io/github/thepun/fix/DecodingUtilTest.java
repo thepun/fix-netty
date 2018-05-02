@@ -5,6 +5,11 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -12,61 +17,63 @@ class DecodingUtilTest {
 
     @Test
     void decodeTag() {
-        String fix = "2233=sdf|";
+        String fix = "2233=";
 
         Cursor cursor = prepareCursor(fix);
         DecodingUtil.decodeTag(cursor);
-
         assertEquals(2233, cursor.getTag());
     }
 
-    @Test
-    void decodeInt() {
-        String fix = "5567=45678|";
-
-        Cursor cursor = prepareCursor(fix);
-        DecodingUtil.decodeTag(cursor);
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 9, 10, 345, Integer.MAX_VALUE, -1, -9, -10, - 4356, Integer.MIN_VALUE})
+    void decodeInt(int value) {
+        Cursor cursor = prepareCursor(value + "|");
         DecodingUtil.decodeIntValue(cursor);
-
-        assertEquals(45678, cursor.getIntValue());
+        assertEquals(value, cursor.getIntValue());
     }
 
-    @Test
-    void decodeString() {
-        String fix = "123=asdrty_sdf|";
+    // TODO: identify min/max possible values
+    @ParameterizedTest
+    @ValueSource(doubles = {0, 1, 9, 10, 234, -0, -1, -9, -10, -234, 0.1, 2.1, 1.0, 45.34, -0.1, -2.1, -1.0, -45.34,
+            1000000000, 1000000000.0000000001, -1000000000, -1000000000.0000000001})
+    void decodeDouble(double value) {
+        NumberFormat format = new DecimalFormat("0.0#########");
+        format.setMaximumFractionDigits(10);
+        String fix = format.format(value) + "|";
 
         Cursor cursor = prepareCursor(fix);
-        DecodingUtil.decodeTag(cursor);
-        DecodingUtil.decodeStrValue(cursor);
+        DecodingUtil.decodeDoubleValue(cursor);
+        assertEquals(value, cursor.getDoubleValue());
+    }
 
+    // TODO: add some more special characters
+    @ParameterizedTest
+    @ValueSource(strings = {"", "asdrty_sdf", "a", "qwertyuiopasdfghjklzxcvbQWERRYUIOPASDFGHJKLZXCVBNM", "_`@#$%^&@!^&*(){}1,.\\';"})
+    void decodeString(String value) {
+        String fix = value + "|";
+
+        Cursor cursor = prepareCursor(fix);
+        DecodingUtil.decodeNativeStringValue(cursor);
         OffHeapCharSequence str = new OffHeapCharSequence(cursor.getStrStart(), cursor.getStrLength());
-        assertEquals("asdrty_sdf", str.toString());
+        assertEquals(value, str.toString());
     }
 
     @Test
-    void decodeDoubleWithFloating() {
-        String fix = "567=123.012|";
+    void decodeLogon() {
+        String fix = "98=1|108=30|141=Y|553=name_q|554=password_q|";
 
-        Cursor cursor = prepareCursor(fix);
-        DecodingUtil.decodeTag(cursor);
-        DecodingUtil.decodeDoubleValue(cursor);
+        Logon logon = new Logon();
+        DecodingUtil.decodeLogon(prepareCursor(fix), logon);
 
-        assertEquals(123.012, cursor.getDoubleValue());
+        assertTrue(logon.isResetSqNumFlag());
+        assertEquals(1, logon.getEncryptMethod());
+        assertEquals(30, logon.getHeartbeatInterval());
+        assertEquals("name_q", logon.getUsername());
+        assertEquals("password_q", logon.getPassword());
     }
 
     @Test
-    void decodeDoubleWithoutFloating() {
-        String fix = "111=778|";
-
-        Cursor cursor = prepareCursor(fix);
-        DecodingUtil.decodeTag(cursor);
-        DecodingUtil.decodeDoubleValue(cursor);
-
-        assertEquals(778, cursor.getDoubleValue());
-    }
-
-    @Test
-    void massQuote() {
+    void decodeMassQuote() {
         String fix = "296=1|302=43|295=1|299=0|106=1|134=1000000|135=50000|188=186.129|190=186.14|299=1|10=132|";
 
         MassQuote massQuote = MassQuote.newInstance();
@@ -94,7 +101,7 @@ class DecodingUtilTest {
         ByteBuf buffer = Unpooled.directBuffer(fix.length());
         buffer.writeBytes(fix.replace('|', (char) 1).getBytes(CharsetUtil.US_ASCII));
         Cursor cursor = new Cursor();
-        DecodingUtil.start(cursor, buffer);
+        DecodingUtil.startDecoding(cursor, buffer);
         return cursor;
     }
 }

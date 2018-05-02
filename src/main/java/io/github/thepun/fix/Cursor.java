@@ -17,6 +17,8 @@ final class Cursor {
     private int strLength;
     private long nativeAddress;
     private double doubleValue;
+    private boolean booleanValue;
+    private String strValue;
     private byte[] temp;
 
     ByteBuf getBuffer() {
@@ -89,6 +91,22 @@ final class Cursor {
 
     void setDoubleValue(double doubleValue) {
         this.doubleValue = doubleValue;
+    }
+
+    String getStrValue() {
+        return strValue;
+    }
+
+    void setStrValue(String strValue) {
+        this.strValue = strValue;
+    }
+
+    boolean getBooleanValue() {
+        return booleanValue;
+    }
+
+    void setBooleanValue(boolean booleanValue) {
+        this.booleanValue = booleanValue;
     }
 
     byte[] getTemp() {

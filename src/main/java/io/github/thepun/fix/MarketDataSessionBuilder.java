@@ -1,24 +1,66 @@
 package io.github.thepun.fix;
 
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.concurrent.FastThreadLocalThread;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class MarketDataSessionBuilder {
 
-    private NioEventLoopGroup executor;
-    private FixLogger fixLogger;
+    private static final AtomicInteger DEFAULT_THREAD_COUNTER = new AtomicInteger(1);
+
+
     private String host;
     private int port;
     private int reconnectInterval;
+    private FixLogger fixLogger;
+    private String senderCompId;
+    private String senderSubId;
+    private String targetCompId;
+    private String targetSubId;
+    private String username;
+    private String password;
     private FixConnectListener connectListener;
     private FixDisconnectListener disconnectListener;
     private MarketDataReadyListener readyListener;
     private MarketDataQuotesListener quotesListener;
     private MarketDataSnapshotListener snapshotListener;
+    private NioEventLoopGroup executor;
 
     MarketDataSessionBuilder() {
         host = "localhost";
         port = 9999;
         reconnectInterval = 1000;
+    }
+
+    public MarketDataSessionBuilder senderCompId(String senderCompId) {
+        this.senderCompId = senderCompId;
+        return this;
+    }
+
+    public MarketDataSessionBuilder senderSubId(String senderSubId) {
+        this.senderSubId = senderSubId;
+        return this;
+    }
+
+    public MarketDataSessionBuilder targetCompId(String targetCompId) {
+        this.targetCompId = targetCompId;
+        return this;
+    }
+
+    public MarketDataSessionBuilder targetSubId(String targetSubId) {
+        this.targetSubId = targetSubId;
+        return this;
+    }
+
+    public MarketDataSessionBuilder username(String username) {
+        this.username = username;
+        return this;
+    }
+
+    public MarketDataSessionBuilder password(String password) {
+        this.password = password;
+        return this;
     }
 
     public MarketDataSessionBuilder executor(NioEventLoopGroup executor) {
@@ -72,29 +114,18 @@ public final class MarketDataSessionBuilder {
     }
 
     public ClientMarketDataSession client() {
+        if (readyListener == null) {
+            throw new IllegalStateException("Empty ready listener");
+        }
+
         MarketDataQuotesListener localQuotesListener = quotesListener;
         if (localQuotesListener == null) {
-            localQuotesListener = e -> {};
+            localQuotesListener = NoOpQuotesListener.INSTANCE;
         }
 
         MarketDataSnapshotListener localSnapshotListener = snapshotListener;
         if (localSnapshotListener == null) {
-            localSnapshotListener = e -> {};
-        }
-
-        MarketDataReadyListener localReadyListener = readyListener;
-        if (localReadyListener == null) {
-            localReadyListener = e -> {};
-        }
-
-        FixConnectListener localConnectListener = connectListener;
-        if (localConnectListener == null) {
-            localConnectListener = () -> {};
-        }
-
-        FixDisconnectListener localDisconnectListener = disconnectListener;
-        if (localDisconnectListener == null) {
-            localDisconnectListener = () -> {};
+            localSnapshotListener = NoOpSnapshotListener.INSTANCE;
         }
 
         FixLogger localFixLogger = fixLogger;
@@ -104,9 +135,16 @@ public final class MarketDataSessionBuilder {
 
         NioEventLoopGroup localExecutor = executor;
         if (localExecutor == null) {
-            localExecutor = new NioEventLoopGroup(1);
+            localExecutor = new NioEventLoopGroup(1, r -> {
+                FastThreadLocalThread thread = new FastThreadLocalThread(r);
+                thread.setName("market-data-" + DEFAULT_THREAD_COUNTER.getAndIncrement());
+                thread.setDaemon(true);
+                return thread;
+            });
         }
 
-        return new ClientMarketDataSession(localExecutor, localFixLogger, localQuotesListener, localSnapshotListener, localReadyListener, localConnectListener, localDisconnectListener, host, port, reconnectInterval);
+        FixSessionInfo fixSessionInfo = new FixSessionInfo(senderCompId, senderSubId, targetCompId, targetSubId, username, password);
+
+        return new ClientMarketDataSession(localExecutor, fixSessionInfo, localFixLogger, localQuotesListener, localSnapshotListener, readyListener, connectListener, disconnectListener, host, port, reconnectInterval);
     }
 }

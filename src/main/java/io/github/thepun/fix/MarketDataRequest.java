@@ -11,6 +11,7 @@ public final class MarketDataRequest {
     private int subscriptionRequestType;
     private int marketDepth;
     private String streamReference;
+    private int relatedSymsCount;
     private RelatedSymGroup[] relatedSyms;
 
     private MarketDataRequest() {
@@ -49,11 +50,17 @@ public final class MarketDataRequest {
         this.streamReference = streamReference;
     }
 
+    public int getRelatedSymsCount() {
+        return relatedSymsCount;
+    }
+
     public RelatedSymGroup getRelatedSym(int index) {
         return relatedSyms[index];
     }
 
     public void setRelatedSymCount(int count) {
+        relatedSymsCount = count;
+
         if (relatedSyms.length < count) {
             MarketDataRequest.RelatedSymGroup[] newRelatedSyms = new MarketDataRequest.RelatedSymGroup[count];
             System.arraycopy(relatedSyms, 0, newRelatedSyms, 0, relatedSyms.length);

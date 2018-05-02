@@ -9,9 +9,10 @@ final class DecodingUtil {
     private static final int DELIMITER = 1;
     private static final int EQUAL_SIGN = (int) '=';
     private static final int DIGIT_OFFSET = (int) '0';
+    private static final byte BOOLEAN_TRUE_VALUE = (int) 'Y';
     private static final int FLOAT_PART_SIGN = (int) '.';
 
-    static void start(Cursor cursor, ByteBuf buffer) {
+    static void startDecoding(Cursor cursor, ByteBuf buffer) {
         int readerIndex = buffer.readerIndex();
         cursor.setBuffer(buffer);
         cursor.setIndex(readerIndex);
@@ -107,6 +108,17 @@ final class DecodingUtil {
         cursor.setIndex(index);
     }
 
+    static void decodeBooleanValue(Cursor cursor) {
+        ByteBuf in = cursor.getBuffer();
+        int index = cursor.getIndex();
+
+        byte value = in.getByte(index);
+        cursor.setBooleanValue(value == BOOLEAN_TRUE_VALUE);
+
+        index += 2;
+        cursor.setIndex(index);
+    }
+
     static void decodeDoubleValue(Cursor cursor) {
         ByteBuf in = cursor.getBuffer();
         int count = cursor.getPoint();
@@ -146,7 +158,11 @@ final class DecodingUtil {
         cursor.setDoubleValue(value);
     }
 
-    static void decodeStrValue(Cursor cursor) {
+    static void decodeStringValue(Cursor cursor) {
+        // TODO: decode string value
+    }
+
+    static void decodeNativeStringValue(Cursor cursor) {
         ByteBuf in = cursor.getBuffer();
         int count = cursor.getPoint();
         int index = cursor.getIndex();
@@ -168,7 +184,7 @@ final class DecodingUtil {
         cursor.setIndex(index);
     }
 
-    static void decodeStrValueAsInt(Cursor cursor) {
+    static void decodeStringValueAsInt(Cursor cursor) {
         ByteBuf in = cursor.getBuffer();
         int count = cursor.getPoint();
         int index = cursor.getIndex();
@@ -184,12 +200,40 @@ final class DecodingUtil {
             value = value << 1 + nextByte;
         }
 
-        cursor.setStrAsInt(value);
+        cursor.setIntValue(value);
         cursor.setIndex(index);
     }
 
     static void decodeLogon(Cursor cursor, Logon logon) {
+        // encrypt method
+        decodeTag(cursor);
+        ensureTag(cursor, FixFields.ENCRYPT_METHOD);
+        decodeIntValue(cursor);
+        logon.setEncryptMethod(cursor.getIntValue());
 
+        // heart beat interval
+        decodeTag(cursor);
+        ensureTag(cursor, FixFields.HEART_BT_INT);
+        decodeIntValue(cursor);
+        logon.setHeartbeatInterval(cursor.getIntValue());
+
+        // reset sequence number flag
+        decodeTag(cursor);
+        ensureTag(cursor, FixFields.RESET_SEQ_NUM_FLAG);
+        decodeBooleanValue(cursor);
+        logon.setResetSqNumFlag(cursor.getBooleanValue());
+
+        // username
+        decodeTag(cursor);
+        ensureTag(cursor, FixFields.USERNAME);
+        decodeStringValue(cursor);
+        logon.setUsername(cursor.getStrValue());
+
+        // password
+        decodeTag(cursor);
+        ensureTag(cursor, FixFields.PASSWORD);
+        decodeStringValue(cursor);
+        logon.setPassword(cursor.getStrValue());
     }
 
     static void decodeLogout(Cursor cursor, Logout logout) {
@@ -202,13 +246,13 @@ final class DecodingUtil {
         // req id
         decodeTag(cursor);
         ensureTag(cursor, FixFields.MD_REQ_ID);
-        decodeStrValue(cursor);
+        decodeNativeStringValue(cursor);
         message.getMdReqID().setAddress(cursor.getStrStart(), cursor.getStrLength());
 
         // symbol
         decodeTag(cursor);
         ensureTag(cursor, FixFields.SYMBOL);
-        decodeStrValue(cursor);
+        decodeNativeStringValue(cursor);
         message.getSymbol().setAddress(cursor.getStrStart(), cursor.getStrLength());
 
         // count of MD entries
@@ -231,7 +275,7 @@ final class DecodingUtil {
             // id
             decodeTag(cursor);
             ensureTag(cursor, FixFields.MD_ENTRY_ID);
-            decodeStrValue(cursor);
+            decodeNativeStringValue(cursor);
             entry.getId().setAddress(cursor.getStrStart(), cursor.getStrLength());
 
             // price
@@ -257,7 +301,7 @@ final class DecodingUtil {
         // optional quote id
         int tag = cursor.getTag();
         if (tag == FixFields.QUOTE_ID) {
-            decodeStrValue(cursor);
+            decodeNativeStringValue(cursor);
             message.getQuoteId().setAddress(cursor.getStrStart(), cursor.getStrLength());
             message.setQuoteIdDefined(true);
 
@@ -280,7 +324,7 @@ final class DecodingUtil {
 
             // quote set id
             ensureTag(cursor, FixFields.QUOTE_SET_ID);
-            decodeStrValue(cursor);
+            decodeNativeStringValue(cursor);
             quoteSet.getQuoteSetId().setAddress(cursor.getStrStart(), cursor.getStrLength());
 
             // count of quote entries
@@ -297,7 +341,7 @@ final class DecodingUtil {
                 // quote entry id
                 decodeTag(cursor);
                 ensureTag(cursor, FixFields.QUOTE_ENTRY_ID);
-                decodeStrValue(cursor);
+                decodeNativeStringValue(cursor);
                 entry.getQuoteEntryId().setAddress(cursor.getStrStart(), cursor.getStrLength());
 
                 // one tag in future
@@ -306,7 +350,7 @@ final class DecodingUtil {
                 // optional issuer
                 tag = cursor.getTag();
                 if (tag == FixFields.ISSUER) {
-                    decodeStrValue(cursor);
+                    decodeNativeStringValue(cursor);
                     entry.getIssuer().setAddress(cursor.getStrStart(), cursor.getStrLength());
                     entry.setIssuerIsDefined(true);
 
@@ -353,13 +397,13 @@ final class DecodingUtil {
         // req id
         decodeTag(cursor);
         ensureTag(cursor, FixFields.MD_REQ_ID);
-        decodeStrValue(cursor);
+        decodeNativeStringValue(cursor);
         message.getMdReqID().setAddress(cursor.getStrStart(), cursor.getStrLength());
 
         // symbol
         decodeTag(cursor);
         ensureTag(cursor, FixFields.TEXT);
-        decodeStrValue(cursor);
+        decodeNativeStringValue(cursor);
         message.getText().setAddress(cursor.getStrStart(), cursor.getStrLength());
     }
 }

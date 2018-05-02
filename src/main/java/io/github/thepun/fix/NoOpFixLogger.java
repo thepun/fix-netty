@@ -21,7 +21,7 @@ final class NoOpFixLogger implements FixLogger {
     }
 
     @Override
-    public void outgoing(ByteBuf buffer, int offset, int length) {
+    public void outgoing(ByteBuf first, int firstOffset, int firstLength, ByteBuf second, int secondOffset, int secondLength) {
 
     }
 }

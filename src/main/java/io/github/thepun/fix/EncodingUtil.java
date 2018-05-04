@@ -260,4 +260,12 @@ final class EncodingUtil {
     static void encodeMarketDataRequestReject(Cursor cursor, MarketDataRequestReject message) {
         // TODO: implement market data request reject encoding
     }
+
+    static void encodeHeartbeat(Cursor cursor, Heartbeat message) {
+        // TODO: implements decoding of heartbeat
+    }
+
+    static void encodeTest(Cursor cursor, Test message) {
+        // TODO: implements decoding of test
+    }
 }

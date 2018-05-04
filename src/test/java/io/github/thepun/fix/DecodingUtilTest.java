@@ -109,12 +109,12 @@ class DecodingUtilTest {
 
     @Test
     void decodeMarketDataRequest() {
-
+        // TODO: market data request decode test
     }
 
     @Test
     void decodeMarketDataRequestReject() {
-
+        // TODO: market data request reject decode test
     }
 
     private static Cursor prepareCursor(String fix) {

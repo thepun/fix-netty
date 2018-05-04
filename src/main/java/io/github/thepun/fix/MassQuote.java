@@ -83,14 +83,19 @@ public final class MassQuote extends AbstractReferenceCounted {
 
     @Override
     public ReferenceCounted touch(Object hint) {
-        buffer.touch(hint);
+        if (buffer != null) {
+            buffer.touch(hint);
+        }
+
         return this;
     }
 
     @Override
     protected void deallocate() {
-        buffer.release();
-        buffer = null;
+        if (buffer != null) {
+            buffer.release();
+            buffer = null;
+        }
 
         recyclerHandle.recycle(this);
     }

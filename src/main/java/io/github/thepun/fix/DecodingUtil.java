@@ -435,4 +435,12 @@ final class DecodingUtil {
         decodeNativeStringValue(cursor);
         message.getText().setAddress(cursor.getStrStart(), cursor.getStrLength());
     }
+
+    static void decodeHeartbeat(Cursor cursor, Heartbeat message) {
+        // TODO: implements decoding of heartbeat
+    }
+
+    static void decodeTest(Cursor cursor, Test message) {
+        // TODO: implements decoding of test
+    }
 }

@@ -2,6 +2,8 @@ package io.github.thepun.fix;
 
 final class FixMsgTypes {
 
+    public static final int HEARTBEAT = (int) '0';
+    public static final int TEST = (int) '1';
     public static final int LOGON = (int) 'A';
     public static final int LOGOUT = (int) 'S';
     public static final int MASS_QUOTE = (int) 'i';

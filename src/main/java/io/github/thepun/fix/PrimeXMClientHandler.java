@@ -99,7 +99,6 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
 
         fixLogger.status("Sending logon in session " + sessionName);
 
-        // send logon
         Logon logon = new Logon();
         logon.setEncryptMethod(0);
         logon.setHeartbeatInterval(10);
@@ -107,10 +106,18 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
         logon.setUsername(sessionInfo.getUsername());
         logon.setPassword(sessionInfo.getPassword());
         write(ctx, logon, ctx.voidPromise());
+        flush(ctx);
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) {
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        cancelHeartbeats();
+
+        super.channelInactive(ctx);
+    }
+
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         ByteBuf msgByteBuf = (ByteBuf) msg;
 
         int index, start, length, msgType;
@@ -188,6 +195,28 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
             } else {
                 // slow path
                 switch (msgType) {
+                    case FixMsgTypes.HEARTBEAT:
+                        Heartbeat heartbeat = Heartbeat.newInstance();
+                        decodeHeartbeat(cursor, heartbeat);
+                        // just decode it and not do anything else
+                        break;
+
+                    case FixMsgTypes.TEST:
+                        Test test = Test.newInstance();
+                        decodeTest(cursor, test);
+                        // send heartbeat on test message
+                        Heartbeat heartbeatForTest = Heartbeat.newInstance();
+                        if (test.isTestIdDefined()) {
+                            heartbeatForTest.initBuffer(msgByteBuf);
+                            heartbeatForTest.getTestId().setAddress(test.getTestId());
+                            heartbeatForTest.setTestIdDefined(true);
+                        } else {
+                            heartbeatForTest.setTestIdDefined(false);
+                        }
+                        write(ctx, heartbeatForTest, ctx.voidPromise());
+                        flush(ctx);
+                        break;
+
                     case FixMsgTypes.MARKET_DATA_REJECT:
                         decodeMarketDataRequestReject(cursor, reject);
                         fixLogger.status("Market data request with id " + reject.getMdReqID() + " in session " + sessionName + " was rejected: " + reject.getText());
@@ -196,6 +225,7 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
                     case FixMsgTypes.LOGON:
                         decodeLogon(cursor, logon);
                         fixLogger.status("Received logon in session " + sessionName);
+                        scheduleHeartbeats();
                         SubscriptionSender subscriptionSender = new SubscriptionSender(ctx.channel());
                         readyListener.onReady(subscriptionSender);
                         subscriptionSender.disable();
@@ -204,6 +234,7 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
                     case FixMsgTypes.LOGOUT:
                         decodeLogout(cursor, logout);
                         fixLogger.status("Received logout in session " + sessionName);
+                        cancelHeartbeats();
                         ctx.close();
                         break;
 
@@ -301,11 +332,17 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
         ctx.write(headerBuf, promise);
         int secondOffset = msgByteBuf.readerIndex();
         int secondLength = msgByteBuf.readableBytes();
-        ctx.writeAndFlush(msgByteBuf, promise);
+        ctx.write(msgByteBuf, promise);
 
         // log outgoing message
         fixLogger.outgoing(headerBuf, firstOffset, firstLength, msgByteBuf, secondOffset, secondLength);
     }
 
+    private void scheduleHeartbeats() {
+        // TODO: scheduling of heartbeats
+    }
 
+    private void cancelHeartbeats() {
+        // TODO: cancellation of heartbeats
+    }
 }

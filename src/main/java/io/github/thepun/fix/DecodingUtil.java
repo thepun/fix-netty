@@ -2,7 +2,9 @@ package io.github.thepun.fix;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.DecoderException;
+import io.netty.util.CharsetUtil;
 
+// TODO: add overflow protections
 // TODO: inline cursor
 final class DecodingUtil {
 
@@ -12,13 +14,14 @@ final class DecodingUtil {
     private static final byte BOOLEAN_TRUE_VALUE = (int) 'Y';
     private static final int FLOAT_PART_SIGN = (int) '.';
 
-    static void startDecoding(Cursor cursor, ByteBuf buffer) {
+    static void startDecoding(Cursor cursor, ByteBuf buffer, byte[] temp) {
         int readerIndex = buffer.readerIndex();
         cursor.setBuffer(buffer);
         cursor.setIndex(readerIndex);
         //cursor.setBefore(readerIndex);
         cursor.setPoint(buffer.readableBytes());
         cursor.setNativeAddress(buffer.memoryAddress());
+        cursor.setTemp(temp);
     }
 
     static void ensureTag(Cursor cursor, int tag) {
@@ -159,7 +162,25 @@ final class DecodingUtil {
     }
 
     static void decodeStringValue(Cursor cursor) {
-        // TODO: decode string value
+        ByteBuf in = cursor.getBuffer();
+        int count = cursor.getPoint();
+        int index = cursor.getIndex();
+        byte[] temp = cursor.getTemp();
+
+        int length = 0;
+        for (; index < count; index++) {
+            byte nextByte = in.getByte(index);
+            if (nextByte == DELIMITER) {
+                index++;
+                break;
+            }
+
+            temp[length] = nextByte;
+            length++;
+        }
+
+        cursor.setStrValue(new String(temp, 0, length, CharsetUtil.US_ASCII));
+        cursor.setIndex(index);
     }
 
     static void decodeNativeStringValue(Cursor cursor) {
@@ -237,7 +258,11 @@ final class DecodingUtil {
     }
 
     static void decodeLogout(Cursor cursor, Logout logout) {
-
+        // password
+        decodeTag(cursor);
+        ensureTag(cursor, FixFields.TEXT);
+        decodeStringValue(cursor);
+        logout.setText(cursor.getStrValue());
     }
 
     static void decodeMarketDataSnapshotFullRefresh(Cursor cursor, MarketDataSnapshotFullRefresh message) {
@@ -393,7 +418,11 @@ final class DecodingUtil {
         }
     }
 
-    static void decodeMarketDataReject(Cursor cursor, MarketDataRequestReject message) {
+    static void decodeMarketDataRequest(Cursor cursor, MarketDataRequest message) {
+       // TODO: implements decoding of market data request
+    }
+
+    static void decodeMarketDataRequestReject(Cursor cursor, MarketDataRequestReject message) {
         // req id
         decodeTag(cursor);
         ensureTag(cursor, FixFields.MD_REQ_ID);

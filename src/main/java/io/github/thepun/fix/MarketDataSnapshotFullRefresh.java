@@ -85,8 +85,10 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
 
     @Override
     protected void deallocate() {
-        buffer.release();
-        buffer = null;
+        if (buffer != null) {
+            buffer.release();
+            buffer = null;
+        }
 
         recyclerHandle.recycle(this);
     }

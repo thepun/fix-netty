@@ -5,6 +5,7 @@ import io.netty.buffer.ByteBuf;
 
 import java.math.BigDecimal;
 
+// TODO: add overflow protections
 // TODO: inline cursor
 final class EncodingUtil {
 
@@ -207,38 +208,46 @@ final class EncodingUtil {
         cursor.setIndex(index + length);
     }
 
-    static void encodeLogon(Cursor cursor, Logon logon) {
+    static void encodeLogon(Cursor cursor, Logon message) {
         // TODO: implement logon encoding
     }
 
-    static void encodeMarketDataRequest(Cursor cursor, MarketDataRequest marketDataRequest) {
+    static void encodeLogout(Cursor cursor, Logout message) {
+        // TODO: implement logout encoding
+    }
+
+    static void encodeMassQuote(Cursor cursor, MassQuote message) {
+        // TODO: implement mass quote encoding
+    }
+
+    static void encodeMarketDataRequest(Cursor cursor, MarketDataRequest message) {
         // md req id
         cursor.setTag(FixFields.MD_REQ_ID);
-        cursor.setStrValue(marketDataRequest.getMdReqId());
+        cursor.setStrValue(message.getMdReqId());
         EncodingUtil.encodeTag(cursor);
         EncodingUtil.encodeStringValue(cursor);
 
         // subscription request type
         cursor.setTag(FixFields.SUBSCRIPTION_REQUEST_TYPE);
-        cursor.setIntValue(marketDataRequest.getSubscriptionRequestType());
+        cursor.setIntValue(message.getSubscriptionRequestType());
         EncodingUtil.encodeTag(cursor);
         EncodingUtil.encodeIntValue(cursor);
 
         // market depth
         cursor.setTag(FixFields.MARKET_DEPTH);
-        cursor.setIntValue(marketDataRequest.getMarketDepth());
+        cursor.setIntValue(message.getMarketDepth());
         EncodingUtil.encodeTag(cursor);
         EncodingUtil.encodeIntValue(cursor);
 
         // no related sym
         cursor.setTag(FixFields.NO_RELATED_SYM);
-        cursor.setIntValue(marketDataRequest.getRelatedSymsCount());
+        cursor.setIntValue(message.getRelatedSymsCount());
         EncodingUtil.encodeTag(cursor);
         EncodingUtil.encodeIntValue(cursor);
 
         // related sym loop
-        for (int i = 0; i < marketDataRequest.getRelatedSymsCount(); i++) {
-            MarketDataRequest.RelatedSymGroup relatedSym = marketDataRequest.getRelatedSym(i);
+        for (int i = 0; i < message.getRelatedSymsCount(); i++) {
+            MarketDataRequest.RelatedSymGroup relatedSym = message.getRelatedSym(i);
 
             // symbol
             cursor.setTag(FixFields.SYMBOL);
@@ -246,5 +255,9 @@ final class EncodingUtil {
             EncodingUtil.encodeTag(cursor);
             EncodingUtil.encodeStringValue(cursor);
         }
+    }
+
+    static void encodeMarketDataRequestReject(Cursor cursor, MarketDataRequestReject message) {
+        // TODO: implement market data request reject encoding
     }
 }

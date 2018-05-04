@@ -6,12 +6,10 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.CharsetUtil;
 
-import java.util.Objects;
-
 import static io.github.thepun.fix.DecodingUtil.*;
 import static io.github.thepun.fix.EncodingUtil.*;
 
-final class ClientHandler extends ChannelDuplexHandler {
+final class PrimeXMClientHandler extends ChannelDuplexHandler {
 
     private static final int BEGIN_HEADER_LENGTH = 10;
 
@@ -24,23 +22,22 @@ final class ClientHandler extends ChannelDuplexHandler {
     private final FixSessionInfo sessionInfo;
     private final MarketDataReadyListener readyListener;
     private final MarketDataQuotesListener quotesListener;
-    private final MarketDataSnapshotListener snapshotListener;
 
     private ByteBuf buffer;
     private ByteBuf sessionHeader;
     private ByteBuf beginHeader;
     private ByteBuf bodyLengthHeader;
     private String sessionName;
+    private byte[] heapBuffer;
 
     private int sequenceNumber;
     private int sessionHeaderLength;
 
-    ClientHandler(FixSessionInfo sessionInfo, FixLogger fixLogger, MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener, MarketDataSnapshotListener snapshotListener) {
+    PrimeXMClientHandler(FixSessionInfo sessionInfo, FixLogger fixLogger, MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener) {
         this.fixLogger = fixLogger;
         this.sessionInfo = sessionInfo;
         this.readyListener = readyListener;
         this.quotesListener = quotesListener;
-        this.snapshotListener = snapshotListener;
 
         logon = new Logon();
         logout = new Logout();
@@ -49,6 +46,9 @@ final class ClientHandler extends ChannelDuplexHandler {
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+        // temp heap buffer
+        heapBuffer = new byte[1024];
+
         // begin string buffer is always the same
         ByteBuf newBeginHeader = ctx.alloc().directBuffer();
         newBeginHeader.writeCharSequence("8=FIX.4.4", CharsetUtil.US_ASCII);
@@ -141,7 +141,7 @@ final class ClientHandler extends ChannelDuplexHandler {
 
         // prepare cursor object
         Cursor cursor = new Cursor();
-        startDecoding(cursor, in);
+        startDecoding(cursor, in, heapBuffer);
 
         // read until the end
         index = cursor.getIndex();
@@ -180,40 +180,36 @@ final class ClientHandler extends ChannelDuplexHandler {
             decodeTagAndSkipHeader(cursor);
 
             // read message content
-            switch (msgType) {
-                case FixMsgTypes.MASS_QUOTE:
-                    MassQuote quotes = MassQuote.newInstance();
-                    decodeMassQuote(cursor, quotes);
-                    quotesListener.onMarketData(quotes);
-                    break;
+            if (msgType == FixMsgTypes.MASS_QUOTE) {
+                // fast path
+                MassQuote quotes = MassQuote.newInstance();
+                decodeMassQuote(cursor, quotes);
+                quotesListener.onMarketData(quotes);
+            } else {
+                // slow path
+                switch (msgType) {
+                    case FixMsgTypes.MARKET_DATA_REJECT:
+                        decodeMarketDataRequestReject(cursor, reject);
+                        fixLogger.status("Market data request with id " + reject.getMdReqID() + " in session " + sessionName + " was rejected: " + reject.getText());
+                        break;
 
-                case FixMsgTypes.MARKET_DATA_SNAPSHOT_FULL_REFRESH:
-                    MarketDataSnapshotFullRefresh snapshot = MarketDataSnapshotFullRefresh.newInstance();
-                    decodeMarketDataSnapshotFullRefresh(cursor, snapshot);
-                    snapshotListener.onMarketData(snapshot);
-                    break;
+                    case FixMsgTypes.LOGON:
+                        decodeLogon(cursor, logon);
+                        fixLogger.status("Received logon in session " + sessionName);
+                        SubscriptionSender subscriptionSender = new SubscriptionSender(ctx.channel());
+                        readyListener.onReady(subscriptionSender);
+                        subscriptionSender.disable();
+                        break;
 
-                case FixMsgTypes.MARKET_DATA_REJECT:
-                    decodeMarketDataReject(cursor, reject);
-                    fixLogger.status("Market data request with id " + reject.getMdReqID() + " in session " + sessionName + " was rejected: " + reject.getText());
-                    break;
+                    case FixMsgTypes.LOGOUT:
+                        decodeLogout(cursor, logout);
+                        fixLogger.status("Received logout in session " + sessionName);
+                        ctx.close();
+                        break;
 
-                case FixMsgTypes.LOGON:
-                    decodeLogon(cursor, logon);
-                    fixLogger.status("Received logon in session " + sessionName);
-                    SubscriptionSender subscriptionSender = new SubscriptionSender(ctx.channel());
-                    readyListener.onReady(subscriptionSender);
-                    subscriptionSender.disable();
-                    break;
-
-                case FixMsgTypes.LOGOUT:
-                    decodeLogout(cursor, logout);
-                    fixLogger.status("Received logout in session " + sessionName);
-                    ctx.close();
-                    break;
-
-                default:
-                    fixLogger.status("Unknown message type in session " + sessionName + ": " + msgType);
+                    default:
+                        fixLogger.status("Unknown message type in session " + sessionName + ": " + msgType);
+                }
             }
 
             // skip checksum and change buffer position

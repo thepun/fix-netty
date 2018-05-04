@@ -73,6 +73,16 @@ class DecodingUtilTest {
     }
 
     @Test
+    void decodeLogout() {
+        String fix = "58=dfgewrttyucgvcvbsd wertxcg dsfge|";
+
+        Logout logout = new Logout();
+        DecodingUtil.decodeLogout(prepareCursor(fix), logout);
+
+        assertEquals("dfgewrttyucgvcvbsd wertxcg dsfge", logout.getText());
+    }
+
+    @Test
     void decodeMassQuote() {
         String fix = "296=1|302=43|295=1|299=0|106=1|134=1000000|135=50000|188=186.129|190=186.14|299=1|10=132|";
 
@@ -97,11 +107,22 @@ class DecodingUtilTest {
         assertEquals(186.14, quoteSetEntry.getOfferSpotRate());
     }
 
+    @Test
+    void decodeMarketDataRequest() {
+
+    }
+
+    @Test
+    void decodeMarketDataRequestReject() {
+
+    }
+
     private static Cursor prepareCursor(String fix) {
+        byte[] temp = new byte[1024];
         ByteBuf buffer = Unpooled.directBuffer(fix.length());
         buffer.writeBytes(fix.replace('|', (char) 1).getBytes(CharsetUtil.US_ASCII));
         Cursor cursor = new Cursor();
-        DecodingUtil.startDecoding(cursor, buffer);
+        DecodingUtil.startDecoding(cursor, buffer, temp);
         return cursor;
     }
 }

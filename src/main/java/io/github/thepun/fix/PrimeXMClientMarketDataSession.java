@@ -3,22 +3,18 @@ package io.github.thepun.fix;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.Future;
 
 import java.util.concurrent.TimeUnit;
 
-public final class ClientMarketDataSession {
-
-    public static MarketDataSessionBuilder newBuilder() {
-        return new MarketDataSessionBuilder();
-    }
-
+public final class PrimeXMClientMarketDataSession {
 
     private final FixConnectListener connectListener;
     private final FixDisconnectListener disconnectListener;
-    private final ClientInitializer initializer;
+    private final PrimeXMClientInitializer initializer;
     private final NioEventLoopGroup executor;
     private final FixLogger fixLogger;
     private final String host;
@@ -28,8 +24,9 @@ public final class ClientMarketDataSession {
     private boolean active;
     private Channel lastChannel;
 
-    ClientMarketDataSession(NioEventLoopGroup executor, FixSessionInfo fixSessionInfo, FixLogger fixLogger, MarketDataQuotesListener quotesListener, MarketDataSnapshotListener snapshotListener,
-                            MarketDataReadyListener readyListener, FixConnectListener connectListener, FixDisconnectListener disconnectListener, String host, int port, int reconnectInterval) {
+    PrimeXMClientMarketDataSession(NioEventLoopGroup executor, FixSessionInfo fixSessionInfo, FixLogger fixLogger, MarketDataQuotesListener quotesListener,
+                                   MarketDataReadyListener readyListener, FixConnectListener connectListener, FixDisconnectListener disconnectListener,
+                                   String host, int port, int reconnectInterval) {
         this.connectListener = connectListener;
         this.disconnectListener = disconnectListener;
         this.reconnectInterval = reconnectInterval;
@@ -38,7 +35,7 @@ public final class ClientMarketDataSession {
         this.host = host;
         this.port = port;
 
-        initializer = new ClientInitializer(fixSessionInfo, fixLogger, readyListener, quotesListener, snapshotListener);
+        initializer = new PrimeXMClientInitializer(fixSessionInfo, fixLogger, readyListener, quotesListener);
     }
 
     public synchronized void start() {
@@ -111,6 +108,28 @@ public final class ClientMarketDataSession {
             } else {
                 fixLogger.status("Connection to " + host + ":" + port + " failed: " + f.cause().getMessage());
             }
+        }
+    }
+
+
+    private static final class PrimeXMClientInitializer extends ChannelInitializer<NioSocketChannel> {
+
+        private final FixLogger fixLogger;
+        private final FixSessionInfo fixSessionInfo;
+        private final MarketDataReadyListener readyListener;
+        private final MarketDataQuotesListener quotesListener;
+
+        PrimeXMClientInitializer(FixSessionInfo fixSessionInfo, FixLogger fixLogger,
+                                 MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener) {
+            this.fixLogger = fixLogger;
+            this.fixSessionInfo = fixSessionInfo;
+            this.readyListener = readyListener;
+            this.quotesListener = quotesListener;
+        }
+
+        @Override
+        protected void initChannel(NioSocketChannel ch) {
+            ch.pipeline().addLast(new PrimeXMClientHandler(fixSessionInfo, fixLogger, readyListener, quotesListener));
         }
     }
 }

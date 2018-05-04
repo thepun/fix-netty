@@ -27,7 +27,7 @@ public final class MarketDataSessionBuilder {
     private MarketDataSnapshotListener snapshotListener;
     private NioEventLoopGroup executor;
 
-    MarketDataSessionBuilder() {
+    public MarketDataSessionBuilder() {
         host = "localhost";
         port = 9999;
         reconnectInterval = 1000;
@@ -113,7 +113,7 @@ public final class MarketDataSessionBuilder {
         return this;
     }
 
-    public ClientMarketDataSession client() {
+    public PrimeXMClientMarketDataSession client() {
         if (readyListener == null) {
             throw new IllegalStateException("Empty ready listener");
         }
@@ -145,6 +145,6 @@ public final class MarketDataSessionBuilder {
 
         FixSessionInfo fixSessionInfo = new FixSessionInfo(senderCompId, senderSubId, targetCompId, targetSubId, username, password);
 
-        return new ClientMarketDataSession(localExecutor, fixSessionInfo, localFixLogger, localQuotesListener, localSnapshotListener, readyListener, connectListener, disconnectListener, host, port, reconnectInterval);
+        return new PrimeXMClientMarketDataSession(localExecutor, fixSessionInfo, localFixLogger, localQuotesListener, localSnapshotListener, readyListener, connectListener, disconnectListener, host, port, reconnectInterval);
     }
 }

@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -18,10 +19,11 @@ class EncodingUtilTest {
 
     @BeforeEach
     void prepare() {
+        byte[] temp = new byte[1024];
         ByteBuf buffer = Unpooled.directBuffer(1024);
         cursor = new Cursor();
         cursor.setTemp(new byte[1024]);
-        DecodingUtil.startDecoding(cursor, buffer);
+        DecodingUtil.startDecoding(cursor, buffer, temp);
     }
 
     @ParameterizedTest
@@ -54,13 +56,29 @@ class EncodingUtilTest {
     // TODO: add some more special characters
     @ParameterizedTest
     @ValueSource(strings = {"", "asdrty_sdf", "a", "qwertyuiopasdfghjklzxcvbQWERRYUIOPASDFGHJKLZXCVBNM", "_`@#$%^&@!^&*(){}1,.\\';"})
-    void encodeString(String value) {
+    void encodeNativeString(String value) {
         ByteBuf string = Unpooled.directBuffer();
         string.writeCharSequence(value, CharsetUtil.US_ASCII);
         cursor.setStrStart(string.memoryAddress() + string.readerIndex());
         cursor.setStrLength(string.readableBytes());
         EncodingUtil.encodeStringNativeValue(cursor);
         assertEquals(value + "|", readString());
+    }
+
+    @Test
+    void encodeMarketDataRequest() {
+        MarketDataRequest marketDataRequest = MarketDataRequest.newInstance();
+        marketDataRequest.setMdReqId("asdfghrty");
+        marketDataRequest.setMarketDepth(99);
+        marketDataRequest.setRelatedSymCount(3);
+        marketDataRequest.setStreamReference("stream1");
+        marketDataRequest.setSubscriptionRequestType(FixEnums.SUBSCRIPTION_REQUEST_TYPE_SUBSCRIBE);
+        marketDataRequest.getRelatedSym(0).setSymbol("EURUSD");
+        marketDataRequest.getRelatedSym(1).setSymbol("EURCAD_");
+        marketDataRequest.getRelatedSym(2).setSymbol("XYZ");
+
+        EncodingUtil.encodeMarketDataRequest(cursor, marketDataRequest);
+        assertEquals("|", readString());
     }
 
     private String readString() {

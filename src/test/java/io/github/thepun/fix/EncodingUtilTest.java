@@ -31,7 +31,7 @@ class EncodingUtilTest {
     void encodeTag(int tag) {
         cursor.setTag(tag);
         EncodingUtil.encodeTag(cursor);
-        assertEquals(tag + "=", readString());
+        assertEquals(tag + "=", FixHelper.readString(cursor));
     }
 
     @ParameterizedTest
@@ -39,7 +39,7 @@ class EncodingUtilTest {
     void encodeInt(int value) {
         cursor.setIntValue(value);
         EncodingUtil.encodeIntValue(cursor);
-        assertEquals(value + "|", readString());
+        assertEquals(value + "|", FixHelper.readString(cursor));
     }
 
     // TODO: identify min/max possible values
@@ -50,7 +50,7 @@ class EncodingUtilTest {
         NumberFormat format = new DecimalFormat("0.0#########");
         cursor.setDoubleValue(value);
         EncodingUtil.encodeDoubleValue(cursor);
-        assertEquals(format.format(value) + "|", readString());
+        assertEquals(format.format(value) + "|", FixHelper.readString(cursor));
     }
 
     // TODO: add some more special characters
@@ -62,12 +62,12 @@ class EncodingUtilTest {
         cursor.setStrStart(string.memoryAddress() + string.readerIndex());
         cursor.setStrLength(string.readableBytes());
         EncodingUtil.encodeStringNativeValue(cursor);
-        assertEquals(value + "|", readString());
+        assertEquals(value + "|", FixHelper.readString(cursor));
     }
 
     @Test
     void encodeMarketDataRequest() {
-        MarketDataRequest marketDataRequest = MarketDataRequest.newInstance();
+        MarketDataRequest marketDataRequest = new MarketDataRequest();
         marketDataRequest.setMdReqId("asdfghrty");
         marketDataRequest.setMarketDepth(99);
         marketDataRequest.setRelatedSymCount(3);
@@ -78,12 +78,7 @@ class EncodingUtilTest {
         marketDataRequest.getRelatedSym(2).setSymbol("XYZ");
 
         EncodingUtil.encodeMarketDataRequest(cursor, marketDataRequest);
-        assertEquals("|", readString());
+        assertEquals("|", FixHelper.readString(cursor));
     }
 
-    private String readString() {
-        ByteBuf buffer = cursor.getBuffer();
-        buffer.writerIndex(cursor.getIndex());
-        return buffer.readCharSequence(buffer.readableBytes(), CharsetUtil.US_ASCII).toString().replace((char) 1, '|');
-    }
 }

@@ -16,7 +16,7 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
         }
     };
 
-    public static MarketDataSnapshotFullRefresh newInstance() {
+    public static MarketDataSnapshotFullRefresh reuseOrCreate() {
         return RECYCLER.get();
     }
 

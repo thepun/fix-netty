@@ -26,7 +26,7 @@ public final class PrimeXMClientMarketDataSession {
 
     PrimeXMClientMarketDataSession(NioEventLoopGroup executor, FixSessionInfo fixSessionInfo, FixLogger fixLogger, MarketDataQuotesListener quotesListener,
                                    MarketDataReadyListener readyListener, FixConnectListener connectListener, FixDisconnectListener disconnectListener,
-                                   String host, int port, int reconnectInterval) {
+                                   String host, int port, int reconnectInterval, int heartbeatInterval) {
         this.connectListener = connectListener;
         this.disconnectListener = disconnectListener;
         this.reconnectInterval = reconnectInterval;
@@ -35,7 +35,7 @@ public final class PrimeXMClientMarketDataSession {
         this.host = host;
         this.port = port;
 
-        initializer = new PrimeXMClientInitializer(fixSessionInfo, fixLogger, readyListener, quotesListener);
+        initializer = new PrimeXMClientInitializer(fixSessionInfo, fixLogger, readyListener, quotesListener, heartbeatInterval);
     }
 
     public synchronized void start() {
@@ -89,7 +89,7 @@ public final class PrimeXMClientMarketDataSession {
     private synchronized void onDisconnect(Future<? super Void> f) {
         if (active) {
             fixLogger.status("Scheduling reconnect to " + host + ":" + port);
-            executor.schedule(this::reconnect, reconnectInterval, TimeUnit.MILLISECONDS);
+            executor.schedule(this::reconnect, reconnectInterval, TimeUnit.SECONDS);
 
             if (disconnectListener != null) {
                 disconnectListener.onDisconnect();
@@ -118,18 +118,20 @@ public final class PrimeXMClientMarketDataSession {
         private final FixSessionInfo fixSessionInfo;
         private final MarketDataReadyListener readyListener;
         private final MarketDataQuotesListener quotesListener;
+        private final int heartbeatInterval;
 
         PrimeXMClientInitializer(FixSessionInfo fixSessionInfo, FixLogger fixLogger,
-                                 MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener) {
+                                 MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener, int heartbeatInterval) {
             this.fixLogger = fixLogger;
             this.fixSessionInfo = fixSessionInfo;
             this.readyListener = readyListener;
             this.quotesListener = quotesListener;
+            this.heartbeatInterval = heartbeatInterval;
         }
 
         @Override
         protected void initChannel(NioSocketChannel ch) {
-            ch.pipeline().addLast(new PrimeXMClientHandler(fixSessionInfo, fixLogger, readyListener, quotesListener));
+            ch.pipeline().addLast(new PrimeXMClientHandler(fixSessionInfo, fixLogger, readyListener, quotesListener, heartbeatInterval));
         }
     }
 }

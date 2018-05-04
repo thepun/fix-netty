@@ -13,6 +13,7 @@ public final class MarketDataSessionBuilder {
     private String host;
     private int port;
     private int reconnectInterval;
+    private int heartbeatInterval;
     private FixLogger fixLogger;
     private String senderCompId;
     private String senderSubId;
@@ -30,7 +31,8 @@ public final class MarketDataSessionBuilder {
     public MarketDataSessionBuilder() {
         host = "localhost";
         port = 9999;
-        reconnectInterval = 1000;
+        reconnectInterval = 5;
+        heartbeatInterval = 30;
     }
 
     public MarketDataSessionBuilder senderCompId(String senderCompId) {
@@ -88,6 +90,11 @@ public final class MarketDataSessionBuilder {
         return this;
     }
 
+    public MarketDataSessionBuilder hearbeatInterval(int hearbeatInterval) {
+        this.heartbeatInterval = hearbeatInterval;
+        return this;
+    }
+
     public MarketDataSessionBuilder quotesListener(MarketDataQuotesListener quotesListener) {
         this.quotesListener = quotesListener;
         return this;
@@ -131,7 +138,7 @@ public final class MarketDataSessionBuilder {
         if (localExecutor == null) {
             localExecutor = new NioEventLoopGroup(1, r -> {
                 FastThreadLocalThread thread = new FastThreadLocalThread(r);
-                thread.setName("market-data-" + DEFAULT_THREAD_COUNTER.getAndIncrement());
+                thread.setName("primexm-client-" + DEFAULT_THREAD_COUNTER.getAndIncrement());
                 thread.setDaemon(true);
                 return thread;
             });
@@ -139,7 +146,8 @@ public final class MarketDataSessionBuilder {
 
         FixSessionInfo fixSessionInfo = new FixSessionInfo(senderCompId, senderSubId, targetCompId, targetSubId, username, password);
 
-        return new PrimeXMClientMarketDataSession(localExecutor, fixSessionInfo, localFixLogger, quotesListener, readyListener, connectListener, disconnectListener, host, port, reconnectInterval);
+        return new PrimeXMClientMarketDataSession(localExecutor, fixSessionInfo, localFixLogger, quotesListener,
+                readyListener, connectListener, disconnectListener, host, port, reconnectInterval, heartbeatInterval);
     }
 
     public PrimeXMServerMarketDataSession primeXmServer() {

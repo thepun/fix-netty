@@ -2,11 +2,6 @@ package io.github.thepun.fix;
 
 public final class MarketDataRequest {
 
-    public static MarketDataRequest newInstance() {
-        return new MarketDataRequest();
-    }
-
-
     private String mdReqId;
     private int subscriptionRequestType;
     private int marketDepth;
@@ -14,7 +9,7 @@ public final class MarketDataRequest {
     private int relatedSymsCount;
     private RelatedSymGroup[] relatedSyms;
 
-    private MarketDataRequest() {
+    public MarketDataRequest() {
         relatedSyms = new RelatedSymGroup[0];
     }
 

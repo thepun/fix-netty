@@ -18,13 +18,14 @@ final class EncodingUtil {
     private static final byte DOT_SIGN = (byte) '.';
     private static final int DIGIT_OFFSET = (int) '0';
 
-    static void startEncoding(Cursor cursor, ByteBuf buffer) {
+    static void startEncoding(Cursor cursor, ByteBuf buffer, byte[] heapBuffer) {
         int readerIndex = buffer.readerIndex();
         cursor.setBuffer(buffer);
         cursor.setIndex(readerIndex);
         //cursor.setBefore(readerIndex);
         cursor.setPoint(buffer.readableBytes());
         cursor.setNativeAddress(buffer.memoryAddress());
+        cursor.setTemp(heapBuffer);
     }
 
     static int encodeDelimiter(ByteBuf out, int index) {

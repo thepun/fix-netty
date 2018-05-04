@@ -86,7 +86,7 @@ class DecodingUtilTest {
     void decodeMassQuote() {
         String fix = "296=1|302=43|295=1|299=0|106=1|134=1000000|135=50000|188=186.129|190=186.14|299=1|10=132|";
 
-        MassQuote massQuote = MassQuote.newInstance();
+        MassQuote massQuote = MassQuote.reuseOrCreate();
         DecodingUtil.decodeMassQuote(prepareCursor(fix), massQuote);
 
         assertFalse(massQuote.isQuoteIdDefined());

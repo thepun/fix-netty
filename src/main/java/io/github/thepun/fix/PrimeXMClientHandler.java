@@ -5,6 +5,9 @@ import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.CharsetUtil;
+import io.netty.util.concurrent.ScheduledFuture;
+
+import java.util.concurrent.TimeUnit;
 
 import static io.github.thepun.fix.DecodingUtil.*;
 import static io.github.thepun.fix.EncodingUtil.*;
@@ -14,9 +17,7 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
     private static final int BEGIN_HEADER_LENGTH = 10;
 
 
-    private final Logon logon;
-    private final Logout logout;
-    private final MarketDataRequestReject reject;
+    private final int heartbeatInterval;
 
     private final FixLogger fixLogger;
     private final FixSessionInfo sessionInfo;
@@ -32,16 +33,14 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
 
     private int sequenceNumber;
     private int sessionHeaderLength;
+    private ScheduledFuture<?> heartbeatSchedule;
 
-    PrimeXMClientHandler(FixSessionInfo sessionInfo, FixLogger fixLogger, MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener) {
+    PrimeXMClientHandler(FixSessionInfo sessionInfo, FixLogger fixLogger, MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener, int heartbeatInterval) {
         this.fixLogger = fixLogger;
         this.sessionInfo = sessionInfo;
         this.readyListener = readyListener;
         this.quotesListener = quotesListener;
-
-        logon = new Logon();
-        logout = new Logout();
-        reject = new MarketDataRequestReject();
+        this.heartbeatInterval = heartbeatInterval;
     }
 
     @Override
@@ -106,7 +105,7 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
         logon.setUsername(sessionInfo.getUsername());
         logon.setPassword(sessionInfo.getPassword());
         write(ctx, logon, ctx.voidPromise());
-        flush(ctx);
+        ctx.flush();
     }
 
     @Override
@@ -117,7 +116,7 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+    public void channelRead(ChannelHandlerContext ctx, Object msg) {
         ByteBuf msgByteBuf = (ByteBuf) msg;
 
         int index, start, length, msgType;
@@ -189,7 +188,7 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
             // read message content
             if (msgType == FixMsgTypes.MASS_QUOTE) {
                 // fast path
-                MassQuote quotes = MassQuote.newInstance();
+                MassQuote quotes = MassQuote.reuseOrCreate();
                 decodeMassQuote(cursor, quotes);
                 quotesListener.onMarketData(quotes);
             } else {
@@ -214,24 +213,27 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
                             heartbeatForTest.setTestIdDefined(false);
                         }
                         write(ctx, heartbeatForTest, ctx.voidPromise());
-                        flush(ctx);
+                        ctx.flush();
                         break;
 
                     case FixMsgTypes.MARKET_DATA_REJECT:
+                        MarketDataRequestReject reject = new MarketDataRequestReject();
                         decodeMarketDataRequestReject(cursor, reject);
                         fixLogger.status("Market data request with id " + reject.getMdReqID() + " in session " + sessionName + " was rejected: " + reject.getText());
                         break;
 
                     case FixMsgTypes.LOGON:
+                        Logon logon = new Logon();
                         decodeLogon(cursor, logon);
                         fixLogger.status("Received logon in session " + sessionName);
-                        scheduleHeartbeats();
+                        scheduleHeartbeats(ctx);
                         SubscriptionSender subscriptionSender = new SubscriptionSender(ctx.channel());
                         readyListener.onReady(subscriptionSender);
                         subscriptionSender.disable();
                         break;
 
                     case FixMsgTypes.LOGOUT:
+                        Logout logout = new Logout();
                         decodeLogout(cursor, logout);
                         fixLogger.status("Received logout in session " + sessionName);
                         cancelHeartbeats();
@@ -265,7 +267,7 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
         // prepare cursor
         ByteBuf msgByteBuf = ctx.alloc().directBuffer();
         Cursor cursor = new Cursor();
-        startEncoding(cursor, msgByteBuf);
+        startEncoding(cursor, msgByteBuf, heapBuffer);
         int start = cursor.getIndex();
 
         // write msg type
@@ -293,6 +295,11 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
 
             MarketDataRequest marketDataRequest = (MarketDataRequest) msg;
             encodeMarketDataRequest(cursor, marketDataRequest);
+        } else if (msg instanceof Heartbeat) {
+            msgByteBuf.setByte(msgTypeIndex, FixMsgTypes.HEARTBEAT);
+
+            Heartbeat heartbeat = (Heartbeat) msg;
+            encodeHeartbeat(cursor, heartbeat);
         } else if (msg instanceof Logon) {
             msgByteBuf.setByte(msgTypeIndex, FixMsgTypes.LOGON);
 
@@ -300,6 +307,7 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
             encodeLogon(cursor, logon);
         } else {
             fixLogger.status("Unknown message: " + msg.getClass().getName());
+            return;
         }
 
         // remember body length and calculate checksum
@@ -322,27 +330,36 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
         msgByteBuf.writerIndex(index);
 
         // write actual body length
-        startEncoding(cursor, headerBuf);
+        startEncoding(cursor, headerBuf, heapBuffer);
         cursor.setIntValue(bodyLength);
         encodeIntValue(cursor);
 
         // remember indexes and send to channel
         int firstOffset = headerBuf.readerIndex();
         int firstLength = headerBuf.readableBytes();
-        ctx.write(headerBuf, promise);
         int secondOffset = msgByteBuf.readerIndex();
         int secondLength = msgByteBuf.readableBytes();
+        ctx.write(headerBuf, promise);
         ctx.write(msgByteBuf, promise);
+        ctx.flush();
 
         // log outgoing message
         fixLogger.outgoing(headerBuf, firstOffset, firstLength, msgByteBuf, secondOffset, secondLength);
     }
 
-    private void scheduleHeartbeats() {
-        // TODO: scheduling of heartbeats
+    private void scheduleHeartbeats(ChannelHandlerContext ctx) {
+        heartbeatSchedule = ctx.executor().schedule(() -> {
+            Heartbeat heartbeatForTest = Heartbeat.newInstance();
+            heartbeatForTest.setTestIdDefined(false);
+            write(ctx, heartbeatForTest, ctx.voidPromise());
+            ctx.flush();
+        }, heartbeatInterval, TimeUnit.SECONDS);
     }
 
     private void cancelHeartbeats() {
-        // TODO: cancellation of heartbeats
+        if (heartbeatSchedule != null) {
+            heartbeatSchedule.cancel(false);
+            heartbeatSchedule = null;
+        }
     }
 }

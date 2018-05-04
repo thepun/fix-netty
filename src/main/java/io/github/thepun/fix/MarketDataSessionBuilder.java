@@ -113,19 +113,13 @@ public final class MarketDataSessionBuilder {
         return this;
     }
 
-    public PrimeXMClientMarketDataSession client() {
+    public PrimeXMClientMarketDataSession primeXmClient() {
         if (readyListener == null) {
             throw new IllegalStateException("Empty ready listener");
         }
 
-        MarketDataQuotesListener localQuotesListener = quotesListener;
-        if (localQuotesListener == null) {
-            localQuotesListener = NoOpQuotesListener.INSTANCE;
-        }
-
-        MarketDataSnapshotListener localSnapshotListener = snapshotListener;
-        if (localSnapshotListener == null) {
-            localSnapshotListener = NoOpSnapshotListener.INSTANCE;
+        if (quotesListener == null) {
+            throw new IllegalStateException("Empty quote listener");
         }
 
         FixLogger localFixLogger = fixLogger;
@@ -145,6 +139,10 @@ public final class MarketDataSessionBuilder {
 
         FixSessionInfo fixSessionInfo = new FixSessionInfo(senderCompId, senderSubId, targetCompId, targetSubId, username, password);
 
-        return new PrimeXMClientMarketDataSession(localExecutor, fixSessionInfo, localFixLogger, localQuotesListener, localSnapshotListener, readyListener, connectListener, disconnectListener, host, port, reconnectInterval);
+        return new PrimeXMClientMarketDataSession(localExecutor, fixSessionInfo, localFixLogger, quotesListener, readyListener, connectListener, disconnectListener, host, port, reconnectInterval);
+    }
+
+    public PrimeXMServerMarketDataSession primeXmServer() {
+        return null;
     }
 }

@@ -107,6 +107,7 @@ public final class MassQuote extends AbstractReferenceCounted {
 
         private int entryCount;
         private QuoteEntry[] entries;
+        private boolean quoteSetIdDefined;
 
         private QuoteSet() {
             quoteSetId = new OffHeapCharSequence();
@@ -115,6 +116,14 @@ public final class MassQuote extends AbstractReferenceCounted {
 
         public OffHeapCharSequence getQuoteSetId() {
             return quoteSetId;
+        }
+
+        public boolean isQuoteSetIdDefined() {
+            return quoteSetIdDefined;
+        }
+
+        public void setQuoteSetIdDefined(boolean quoteSetIdDefined) {
+            this.quoteSetIdDefined = quoteSetIdDefined;
         }
 
         public int getEntryCount() {
@@ -152,7 +161,8 @@ public final class MassQuote extends AbstractReferenceCounted {
         private double bidSpotRate;
         private double offerSize;
         private double offerSpotRate;
-        private boolean issuerIsDefined;
+        private boolean issuerDefined;
+        private boolean quoteEntryIdDefined;
 
         private QuoteEntry() {
             quoteEntryId = new OffHeapCharSequence();
@@ -199,12 +209,20 @@ public final class MassQuote extends AbstractReferenceCounted {
             this.offerSpotRate = offerSpotRate;
         }
 
-        public boolean isIssuerIsDefined() {
-            return issuerIsDefined;
+        public boolean isIssuerDefined() {
+            return issuerDefined;
         }
 
-        public void setIssuerIsDefined(boolean issuerIsDefined) {
-            this.issuerIsDefined = issuerIsDefined;
+        public void setIssuerDefined(boolean issuerDefined) {
+            this.issuerDefined = issuerDefined;
+        }
+
+        public boolean isQuoteEntryIdDefined() {
+            return quoteEntryIdDefined;
+        }
+
+        public void setQuoteEntryIdDefined(boolean quoteEntryIdDefined) {
+            this.quoteEntryIdDefined = quoteEntryIdDefined;
         }
     }
 }

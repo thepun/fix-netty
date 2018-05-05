@@ -14,7 +14,8 @@ import static io.github.thepun.fix.EncodingUtil.*;
 
 final class PrimeXMClientHandler extends ChannelDuplexHandler {
 
-    private static final int BEGIN_HEADER_LENGTH = 10;
+    private static final String BEGIN_HEADER = "8=FIX.4.4" + ((char)1) + "9=";
+    private static final int BEGIN_HEADER_LENGTH = BEGIN_HEADER.length();
 
 
     private final int heartbeatInterval;
@@ -50,14 +51,8 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
 
         // begin string buffer is always the same
         ByteBuf newBeginHeader = ctx.alloc().directBuffer();
-        newBeginHeader.writeCharSequence("8=FIX.4.4", CharsetUtil.US_ASCII);
-        newBeginHeader.writeByte(1);
+        newBeginHeader.writeCharSequence(BEGIN_HEADER, CharsetUtil.US_ASCII);
         beginHeader = newBeginHeader;
-
-        // body length prefix
-        ByteBuf newBodyLengthHeader = ctx.alloc().directBuffer();
-        newBodyLengthHeader.writeCharSequence("9=", CharsetUtil.US_ASCII);
-        bodyLengthHeader = newBeginHeader;
 
         // session header is also always the same
         ByteBuf newSessionHeader = ctx.alloc().directBuffer();
@@ -73,6 +68,7 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
             newSessionHeader.writeCharSequence(FixFields.TARGET_SUB_ID + "=" + sessionInfo.getTargetSubId(), CharsetUtil.US_ASCII);
             newSessionHeader.writeByte(1);
         }
+        newSessionHeader.writeCharSequence(FixFields.SENDING_TIME + "=", CharsetUtil.US_ASCII);
         sessionHeader = newSessionHeader;
         sessionHeaderLength = newSessionHeader.readableBytes();
 
@@ -115,6 +111,7 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
         super.channelInactive(ctx);
     }
 
+    // TODO: ensure on error buffers will not leak
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
         ByteBuf msgByteBuf = (ByteBuf) msg;
@@ -168,7 +165,7 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
             length += 7; // include checksum
 
             // check we have enough bytes
-            if (cursor.getIndex() + length >= cursor.getPoint()) {
+            if (cursor.getIndex() + length > cursor.getPoint()) {
                 buffer = in;
                 return;
             }
@@ -181,9 +178,9 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
             ensureTag(cursor, FixFields.MSG_TYPE);
             decodeStringValueAsInt(cursor);
             msgType = cursor.getIntValue();
-
+            // TODO: read header in fixed order
             // skip rest header fields
-            decodeTagAndSkipHeader(cursor);
+            skipHeader(cursor);
 
             // read message content
             if (msgType == FixMsgTypes.MASS_QUOTE) {
@@ -246,7 +243,7 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
             }
 
             // skip checksum and change buffer position
-            index = cursor.getIndex();
+            index = cursor.getIndex() + 7;
             in.readerIndex(index);
         }
 
@@ -255,17 +252,19 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
         buffer = null;
     }
 
+    // TODO: ensure on error buffers will not leak
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
         int index;
 
-        // write begin string + body length mock
+        // prepare buffers
         ByteBuf headerBuf = ctx.alloc().directBuffer();
-        beginHeader.getBytes(0, headerBuf);
-        bodyLengthHeader.getBytes(BEGIN_HEADER_LENGTH, headerBuf);
+        ByteBuf msgByteBuf = ctx.alloc().directBuffer();
+
+        // write static header
+        headerBuf.writeBytes(beginHeader, 0, BEGIN_HEADER_LENGTH);
 
         // prepare cursor
-        ByteBuf msgByteBuf = ctx.alloc().directBuffer();
         Cursor cursor = new Cursor();
         startEncoding(cursor, msgByteBuf, heapBuffer);
         int start = cursor.getIndex();
@@ -286,8 +285,12 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
 
         // write session info
         index = cursor.getIndex();
-        sessionHeader.getBytes(index, msgByteBuf);
+        sessionHeader.getBytes(0, msgByteBuf, index, sessionHeaderLength);
         cursor.setIndex(index + sessionHeaderLength);
+
+        // write sending time value
+        cursor.setLongValue(System.currentTimeMillis());
+        encodeDateTime(cursor);
 
         // write body
         if (msg instanceof MarketDataRequest) {
@@ -331,8 +334,10 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
 
         // write actual body length
         startEncoding(cursor, headerBuf, heapBuffer);
+        cursor.setIndex(headerBuf.writerIndex());
         cursor.setIntValue(bodyLength);
         encodeIntValue(cursor);
+        headerBuf.writerIndex(cursor.getIndex());
 
         // remember indexes and send to channel
         int firstOffset = headerBuf.readerIndex();

@@ -2,18 +2,27 @@ package io.github.thepun.fix;
 
 import io.github.thepun.unsafe.OffHeapMemory;
 import io.netty.buffer.ByteBuf;
+import io.netty.util.CharsetUtil;
 
-import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 
 // TODO: add overflow protections
 // TODO: inline cursor
+// TODO: replace date formatter with custom implementation
 final class EncodingUtil {
+
+    private static final ZoneId GMT = ZoneId.of("GMT");
+    private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("YYYYMMdd-HH:mm:ss.SSS");
 
     private static final byte DELIMITER = 1;
     private static final int MAX_INT_DIGITS = 10;
     private static final int MAX_INT_DIGITS_PLUS_ONE = MAX_INT_DIGITS + 1;
     private static final int MAX_INT_DIGITS_PLUS_TWO = MAX_INT_DIGITS + 2;
     private static final int EQUAL_SIGN = (int) '=';
+    private static final byte BOOLEAN_TRUE_VALUE = (int) 'Y';
+    private static final byte BOOLEAN_FALSE_VALUE = (int) 'N';
     private static final byte MINUS_SIGN = (byte) '-';
     private static final byte DOT_SIGN = (byte) '.';
     private static final int DIGIT_OFFSET = (int) '0';
@@ -28,8 +37,13 @@ final class EncodingUtil {
         cursor.setTemp(heapBuffer);
     }
 
-    static int encodeDelimiter(ByteBuf out, int index) {
+    static int encodeEqualSign(ByteBuf out, int index) {
         out.setByte(index++, EQUAL_SIGN);
+        return index;
+    }
+
+    static int encodeDelimiter(ByteBuf out, int index) {
+        out.setByte(index++, DELIMITER);
         return index;
     }
 
@@ -63,7 +77,7 @@ final class EncodingUtil {
             index = encodeThreeDigitInt(out, index, tagNum);
         }
 
-        index = encodeDelimiter(out, index);
+        index = encodeEqualSign(out, index);
 
         cursor.setIndex(index);
     }
@@ -106,6 +120,19 @@ final class EncodingUtil {
         int length = MAX_INT_DIGITS_PLUS_TWO - pos;
         out.setBytes(index, temp, pos, length);
         index += length;
+
+        cursor.setIndex(index);
+    }
+
+    static void encodeBooleanValue(Cursor cursor) {
+        ByteBuf out = cursor.getBuffer();
+        int index = cursor.getIndex();
+
+        boolean value = cursor.getBooleanValue();
+        byte b = value ? BOOLEAN_TRUE_VALUE : BOOLEAN_FALSE_VALUE;
+        out.setByte(index++, b);
+
+        index = encodeDelimiter(out, index);
 
         cursor.setIndex(index);
     }
@@ -165,17 +192,13 @@ final class EncodingUtil {
         ByteBuf out = cursor.getBuffer();
         int index = cursor.getIndex();
 
-        // TODO: do encoding
-
-        /*// copy text to buffer
-        long addressTo = cursor.getNativeAddress() + index;
-        long addressFrom = cursor.getStrStart();
-        int length = cursor.getStrLength();
-        OffHeapMemory.copy(addressFrom, addressTo, length);
-        index += length;
+        // copy text to buffer by characters
+        String value = cursor.getStrValue();
+        out.setCharSequence(index, value, CharsetUtil.US_ASCII);
+        index = value.length() + index;
 
         // set delimiter
-        out.setByte(index++, DELIMITER);*/
+        out.setByte(index++, DELIMITER);
 
         cursor.setIndex(index);
     }
@@ -192,7 +215,7 @@ final class EncodingUtil {
         index += length;
 
         // set delimiter
-        out.setByte(index++, DELIMITER);
+        index = encodeDelimiter(out, index);
 
         cursor.setIndex(index);
     }
@@ -209,8 +232,51 @@ final class EncodingUtil {
         cursor.setIndex(index + length);
     }
 
+    static void encodeDateTime(Cursor cursor) {
+        long dateTime = cursor.getLongValue();
+        DATE_TIME.formatTo(Instant.ofEpochMilli(dateTime).atZone(GMT), cursor);
+
+        // set delimiter
+        ByteBuf out = cursor.getBuffer();
+        int index = cursor.getIndex();
+        index = encodeDelimiter(out, index);
+        cursor.setIndex(index);
+    }
+
     static void encodeLogon(Cursor cursor, Logon message) {
-        // TODO: implement logon encoding
+        // encrypt method
+        cursor.setTag(FixFields.ENCRYPT_METHOD);
+        cursor.setIntValue(message.getEncryptMethod());
+        encodeTag(cursor);
+        encodeIntValue(cursor);
+
+        // heartbeat interval
+        cursor.setTag(FixFields.HEART_BT_INT);
+        cursor.setIntValue(message.getHeartbeatInterval());
+        encodeTag(cursor);
+        encodeIntValue(cursor);
+
+        // reset seq num flag
+        cursor.setTag(FixFields.RESET_SEQ_NUM_FLAG);
+        cursor.setBooleanValue(message.isResetSqNumFlag());
+        encodeTag(cursor);
+        encodeBooleanValue(cursor);
+
+        // username
+        if (message.getUsername() != null) {
+            cursor.setTag(FixFields.USERNAME);
+            cursor.setStrValue(message.getUsername());
+            encodeTag(cursor);
+            encodeStringValue(cursor);
+        }
+
+        // password
+        if (message.getPassword() != null) {
+            cursor.setTag(FixFields.PASSWORD);
+            cursor.setStrValue(message.getPassword());
+            encodeTag(cursor);
+            encodeStringValue(cursor);
+        }
     }
 
     static void encodeLogout(Cursor cursor, Logout message) {
@@ -225,20 +291,20 @@ final class EncodingUtil {
         // md req id
         cursor.setTag(FixFields.MD_REQ_ID);
         cursor.setStrValue(message.getMdReqId());
-        EncodingUtil.encodeTag(cursor);
-        EncodingUtil.encodeStringValue(cursor);
+        encodeTag(cursor);
+        encodeStringValue(cursor);
 
         // subscription request type
         cursor.setTag(FixFields.SUBSCRIPTION_REQUEST_TYPE);
         cursor.setIntValue(message.getSubscriptionRequestType());
-        EncodingUtil.encodeTag(cursor);
-        EncodingUtil.encodeIntValue(cursor);
+        encodeTag(cursor);
+        encodeIntValue(cursor);
 
         // market depth
         cursor.setTag(FixFields.MARKET_DEPTH);
         cursor.setIntValue(message.getMarketDepth());
-        EncodingUtil.encodeTag(cursor);
-        EncodingUtil.encodeIntValue(cursor);
+        encodeTag(cursor);
+        encodeIntValue(cursor);
 
         // no related sym
         cursor.setTag(FixFields.NO_RELATED_SYM);

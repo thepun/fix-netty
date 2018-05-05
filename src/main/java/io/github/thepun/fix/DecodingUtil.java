@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.DecoderException;
 import io.netty.util.CharsetUtil;
 
+// TODO: remove count checks
 // TODO: add overflow protections
 // TODO: inline cursor
 final class DecodingUtil {
@@ -30,14 +31,16 @@ final class DecodingUtil {
         }
     }
 
-    static void decodeTagAndSkipHeader(Cursor cursor) {
+    static void skipHeader(Cursor cursor) {
         ByteBuf in = cursor.getBuffer();
         int count = cursor.getPoint();
         int index = cursor.getIndex();
 
+        int lastIndex;
         int tagNum = 0;
-
         for (;;) {
+            lastIndex = index;
+
             // read tag
             for (; index < count; index++) {
                 byte nextByte = in.getByte(index);
@@ -56,11 +59,22 @@ final class DecodingUtil {
                     tagNum == FixFields.TARGET_SUB_ID ||
                     tagNum == FixFields.MSG_SEQ_NUM ||
                     tagNum == FixFields.SENDING_TIME) {
+                // reset tag calculation
+                tagNum = 0;
+
+                // skip until next delimiter
+                for (; index < count; index++) {
+                    byte nextByte = in.getByte(index);
+                    if (nextByte == DELIMITER) {
+                        index++;
+                        break;
+                    }
+                }
                 continue;
             }
 
             cursor.setTag(tagNum);
-            cursor.setIndex(index);
+            cursor.setIndex(lastIndex);
             break;
         }
     }
@@ -218,7 +232,7 @@ final class DecodingUtil {
                 break;
             }
 
-            value = value << 1 + nextByte;
+            value = (value << 8) + nextByte;
         }
 
         cursor.setIntValue(value);
@@ -377,7 +391,7 @@ final class DecodingUtil {
                 if (tag == FixFields.ISSUER) {
                     decodeNativeStringValue(cursor);
                     entry.getIssuer().setAddress(cursor.getStrStart(), cursor.getStrLength());
-                    entry.setIssuerIsDefined(true);
+                    entry.setIssuerDefined(true);
 
                     decodeTag(cursor);
                     tag = cursor.getTag();

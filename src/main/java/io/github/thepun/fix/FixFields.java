@@ -11,9 +11,9 @@ final class FixFields {
     public static final int SENDER_SUB_ID = 50;
     public static final int SENDING_TIME = 52;
     public static final int SYMBOL = 55;
+    public static final int TARGET_COMP_ID = 56;
     public static final int TARGET_SUB_ID = 57;
     public static final int TEXT = 58;
-    public static final int TARGET_COMP_ID = 59;
     public static final int ENCRYPT_METHOD = 98;
     public static final int ISSUER = 106;
     public static final int HEART_BT_INT = 108;

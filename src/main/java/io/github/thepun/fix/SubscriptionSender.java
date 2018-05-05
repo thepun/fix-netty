@@ -10,6 +10,8 @@ final class SubscriptionSender implements MarketDataSubscriber {
 
     SubscriptionSender(Channel channel) {
         this.channel = channel;
+
+        enabled = true;
     }
 
     @Override

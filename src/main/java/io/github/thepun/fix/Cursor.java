@@ -1,11 +1,14 @@
 package io.github.thepun.fix;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.util.CharsetUtil;
 import sun.misc.Contended;
+
+import java.io.IOException;
 
 // TODO: inline
 @Contended
-final class Cursor {
+final class Cursor implements Appendable {
 
     private ByteBuf buffer;
     private int point;
@@ -15,11 +18,30 @@ final class Cursor {
     private int intValue;
     private long strStart;
     private int strLength;
+    private long longValue;
     private long nativeAddress;
     private double doubleValue;
     private boolean booleanValue;
     private String strValue;
     private byte[] temp;
+
+    @Override
+    public Appendable append(CharSequence csq) throws IOException {
+        index += buffer.setCharSequence(index, csq, CharsetUtil.US_ASCII);
+        return this;
+    }
+
+    @Override
+    public Appendable append(CharSequence csq, int start, int end) throws IOException {
+        index += buffer.setCharSequence(index, csq.subSequence(start, end), CharsetUtil.US_ASCII);
+        return this;
+    }
+
+    @Override
+    public Appendable append(char c) throws IOException {
+        buffer.setByte(index++, (byte)c);
+        return this;
+    }
 
     ByteBuf getBuffer() {
         return buffer;
@@ -109,6 +131,15 @@ final class Cursor {
         this.booleanValue = booleanValue;
     }
 
+
+    long getLongValue() {
+        return longValue;
+    }
+
+    void setLongValue(long longValue) {
+        this.longValue = longValue;
+    }
+
     byte[] getTemp() {
         return temp;
     }
@@ -116,6 +147,8 @@ final class Cursor {
     void setTemp(byte[] temp) {
         this.temp = temp;
     }
+
+
 
 
 

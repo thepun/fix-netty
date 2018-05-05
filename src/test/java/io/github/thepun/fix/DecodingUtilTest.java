@@ -98,7 +98,7 @@ class DecodingUtilTest {
         assertEquals("43", quoteSet.getQuoteSetId().toString());
 
         MassQuote.QuoteEntry quoteSetEntry = quoteSet.getEntry(0);
-        assertTrue(quoteSetEntry.isIssuerIsDefined());
+        assertTrue(quoteSetEntry.isIssuerDefined());
         assertEquals("1", quoteSetEntry.getIssuer().toString());
         assertEquals("0", quoteSetEntry.getQuoteEntryId().toString());
         assertEquals(1000000, quoteSetEntry.getBidSize());

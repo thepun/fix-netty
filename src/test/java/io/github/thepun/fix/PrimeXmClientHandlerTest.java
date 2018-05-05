@@ -10,19 +10,19 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-class PrimeXMClientHandlerTest {
+class PrimeXmClientHandlerTest {
 
     private FixSessionInfo fixSessionInfo;
     private MarketDataReadyListener readyListener;
     private MarketDataQuotesListener quotesListener;
-    private PrimeXMClientHandler handler;
+    private PrimeXmClientHandler handler;
 
     @BeforeEach
     void prepareMocks() {
         readyListener = mock(MarketDataReadyListener.class);
         quotesListener = mock(MarketDataQuotesListener.class);
         fixSessionInfo = new FixSessionInfo("qwe_", "1asd", "+--341", "sdf", "user", "pass");
-        handler = new PrimeXMClientHandler(fixSessionInfo, NoOpFixLogger.INSTANCE, readyListener, quotesListener, 30);
+        handler = new PrimeXmClientHandler(fixSessionInfo, NoOpFixLogger.INSTANCE, readyListener, quotesListener, 30);
     }
 
     @Test
@@ -106,6 +106,5 @@ class PrimeXMClientHandlerTest {
         assertEquals("1", entry.getIssuer().toString());
         assertTrue(entry.isQuoteEntryIdDefined());
         assertEquals("0", entry.getQuoteEntryId().toString());
-
     }
 }

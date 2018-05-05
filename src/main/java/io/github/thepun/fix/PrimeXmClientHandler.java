@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 import static io.github.thepun.fix.DecodingUtil.*;
 import static io.github.thepun.fix.EncodingUtil.*;
 
-final class PrimeXMClientHandler extends ChannelDuplexHandler {
+final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
     private static final String BEGIN_HEADER = "8=FIX.4.4" + ((char)1) + "9=";
     private static final int BEGIN_HEADER_LENGTH = BEGIN_HEADER.length();
@@ -36,7 +36,7 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
     private int sessionHeaderLength;
     private ScheduledFuture<?> heartbeatSchedule;
 
-    PrimeXMClientHandler(FixSessionInfo sessionInfo, FixLogger fixLogger, MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener, int heartbeatInterval) {
+    PrimeXmClientHandler(FixSessionInfo sessionInfo, FixLogger fixLogger, MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener, int heartbeatInterval) {
         this.fixLogger = fixLogger;
         this.sessionInfo = sessionInfo;
         this.readyListener = readyListener;
@@ -46,6 +46,8 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+        sequenceNumber = 1;
+
         // temp heap buffer
         heapBuffer = new byte[1024];
 
@@ -267,7 +269,6 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
         // prepare cursor
         Cursor cursor = new Cursor();
         startEncoding(cursor, msgByteBuf, heapBuffer);
-        int start = cursor.getIndex();
 
         // write msg type
         cursor.setTag(FixFields.MSG_TYPE);
@@ -313,17 +314,30 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
             return;
         }
 
-        // remember body length and calculate checksum
-        index = cursor.getIndex();
-        int bodyLength = index - start;
+        // write actual body length
+        int bodyLength = cursor.getIndex();
+        startEncoding(cursor, headerBuf, heapBuffer);
+        cursor.setIndex(headerBuf.writerIndex());
+        cursor.setIntValue(bodyLength);
+        encodeIntValue(cursor);
+        int headLength = cursor.getIndex();
+        headerBuf.writerIndex(headLength);
+
+        // calculate checksum
         int sum = 0;
-        for (int i = start; i < index; i++) {
+        for (int i = 0; i < headLength; i++) {
+            byte b = headerBuf.getByte(i);
+            sum += b;
+        }
+        for (int i = 0; i < bodyLength; i++) {
             byte b = msgByteBuf.getByte(i);
             sum += b;
         }
         sum %= 256;
 
         // write checksum and finish
+        startEncoding(cursor, msgByteBuf, heapBuffer);
+        cursor.setIndex(bodyLength);
         cursor.setTag(FixFields.CHECK_SUM);
         cursor.setIntValue(sum);
         encodeTag(cursor);
@@ -332,24 +346,13 @@ final class PrimeXMClientHandler extends ChannelDuplexHandler {
         index = encodeDelimiter(msgByteBuf, index);
         msgByteBuf.writerIndex(index);
 
-        // write actual body length
-        startEncoding(cursor, headerBuf, heapBuffer);
-        cursor.setIndex(headerBuf.writerIndex());
-        cursor.setIntValue(bodyLength);
-        encodeIntValue(cursor);
-        headerBuf.writerIndex(cursor.getIndex());
-
-        // remember indexes and send to channel
-        int firstOffset = headerBuf.readerIndex();
-        int firstLength = headerBuf.readableBytes();
-        int secondOffset = msgByteBuf.readerIndex();
-        int secondLength = msgByteBuf.readableBytes();
+        // send to channel
         ctx.write(headerBuf, promise);
         ctx.write(msgByteBuf, promise);
         ctx.flush();
 
         // log outgoing message
-        fixLogger.outgoing(headerBuf, firstOffset, firstLength, msgByteBuf, secondOffset, secondLength);
+        fixLogger.outgoing(headerBuf, 0, bodyLength, msgByteBuf, 0, headLength);
     }
 
     private void scheduleHeartbeats(ChannelHandlerContext ctx) {

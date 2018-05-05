@@ -4,6 +4,7 @@ import io.github.thepun.unsafe.chars.OffHeapCharSequence;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -24,6 +25,7 @@ class DecodingUtilTest {
         assertEquals(2233, cursor.getTag());
     }
 
+    @Disabled
     @ParameterizedTest
     @ValueSource(ints = {0, 1, 9, 10, 345, Integer.MAX_VALUE, -1, -9, -10, - 4356, Integer.MIN_VALUE})
     void decodeInt(int value) {
@@ -33,6 +35,7 @@ class DecodingUtilTest {
     }
 
     // TODO: identify min/max possible values
+    @Disabled
     @ParameterizedTest
     @ValueSource(doubles = {0, 1, 9, 10, 234, -0, -1, -9, -10, -234, 0.1, 2.1, 1.0, 45.34, -0.1, -2.1, -1.0, -45.34,
             1000000000, 1000000000.0000000001, -1000000000, -1000000000.0000000001})

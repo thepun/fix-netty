@@ -1,8 +1,8 @@
 package io.github.thepun.fix;
 
-public final class PrimeXMServerMarketDataSession {
+public final class PrimeXmServerMarketDataSession {
 
-    PrimeXMServerMarketDataSession() {
+    PrimeXmServerMarketDataSession() {
 
     }
 

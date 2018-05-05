@@ -120,7 +120,7 @@ public final class MarketDataSessionBuilder {
         return this;
     }
 
-    public PrimeXMClientMarketDataSession primeXmClient() {
+    public PrimeXmClientMarketDataSession primeXmClient() {
         if (readyListener == null) {
             throw new IllegalStateException("Empty ready listener");
         }
@@ -146,11 +146,11 @@ public final class MarketDataSessionBuilder {
 
         FixSessionInfo fixSessionInfo = new FixSessionInfo(senderCompId, senderSubId, targetCompId, targetSubId, username, password);
 
-        return new PrimeXMClientMarketDataSession(localExecutor, fixSessionInfo, localFixLogger, quotesListener,
+        return new PrimeXmClientMarketDataSession(localExecutor, fixSessionInfo, localFixLogger, quotesListener,
                 readyListener, connectListener, disconnectListener, host, port, reconnectInterval, heartbeatInterval);
     }
 
-    public PrimeXMServerMarketDataSession primeXmServer() {
+    public PrimeXmServerMarketDataSession primeXmServer() {
         return null;
     }
 }

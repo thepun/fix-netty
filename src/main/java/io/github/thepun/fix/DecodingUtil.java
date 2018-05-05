@@ -355,6 +355,7 @@ final class DecodingUtil {
 
         // we going to decode one tag in future and
         // after each loop iteration we will have first tag already decoded
+        int start = cursor.getIndex();
         decodeTag(cursor);
 
         // quote set loop
@@ -365,6 +366,7 @@ final class DecodingUtil {
             ensureTag(cursor, FixFields.QUOTE_SET_ID);
             decodeNativeStringValue(cursor);
             quoteSet.getQuoteSetId().setAddress(cursor.getStrStart(), cursor.getStrLength());
+            quoteSet.setQuoteSetIdDefined(true);
 
             // count of quote entries
             decodeTag(cursor);
@@ -382,8 +384,10 @@ final class DecodingUtil {
                 ensureTag(cursor, FixFields.QUOTE_ENTRY_ID);
                 decodeNativeStringValue(cursor);
                 entry.getQuoteEntryId().setAddress(cursor.getStrStart(), cursor.getStrLength());
+                entry.setQuoteEntryIdDefined(true);
 
                 // one tag in future
+                start = cursor.getIndex();
                 decodeTag(cursor);
 
                 // optional issuer
@@ -393,6 +397,7 @@ final class DecodingUtil {
                     entry.getIssuer().setAddress(cursor.getStrStart(), cursor.getStrLength());
                     entry.setIssuerDefined(true);
 
+                    start = cursor.getIndex();
                     decodeTag(cursor);
                     tag = cursor.getTag();
                 }
@@ -425,11 +430,14 @@ final class DecodingUtil {
                             break entryTags;
                     }
 
+                    start = cursor.getIndex();
                     decodeTag(cursor);
                     tag = cursor.getTag();
                 }
             }
         }
+
+        cursor.setIndex(start);
     }
 
     static void decodeMarketDataRequest(Cursor cursor, MarketDataRequest message) {

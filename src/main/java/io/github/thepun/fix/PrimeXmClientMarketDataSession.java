@@ -10,7 +10,7 @@ import io.netty.util.concurrent.Future;
 
 import java.util.concurrent.TimeUnit;
 
-public final class PrimeXMClientMarketDataSession {
+public final class PrimeXmClientMarketDataSession {
 
     private final FixConnectListener connectListener;
     private final FixDisconnectListener disconnectListener;
@@ -24,7 +24,7 @@ public final class PrimeXMClientMarketDataSession {
     private boolean active;
     private Channel lastChannel;
 
-    PrimeXMClientMarketDataSession(NioEventLoopGroup executor, FixSessionInfo fixSessionInfo, FixLogger fixLogger, MarketDataQuotesListener quotesListener,
+    PrimeXmClientMarketDataSession(NioEventLoopGroup executor, FixSessionInfo fixSessionInfo, FixLogger fixLogger, MarketDataQuotesListener quotesListener,
                                    MarketDataReadyListener readyListener, FixConnectListener connectListener, FixDisconnectListener disconnectListener,
                                    String host, int port, int reconnectInterval, int heartbeatInterval) {
         this.connectListener = connectListener;
@@ -131,7 +131,7 @@ public final class PrimeXMClientMarketDataSession {
 
         @Override
         protected void initChannel(NioSocketChannel ch) {
-            ch.pipeline().addLast(new PrimeXMClientHandler(fixSessionInfo, fixLogger, readyListener, quotesListener, heartbeatInterval));
+            ch.pipeline().addLast(new PrimeXmClientHandler(fixSessionInfo, fixLogger, readyListener, quotesListener, heartbeatInterval));
         }
     }
 }

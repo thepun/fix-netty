@@ -38,7 +38,7 @@ public final class PrimeXmClientMarketDataSession {
         initializer = new PrimeXMClientInitializer(fixSessionInfo, fixLogger, readyListener, quotesListener, heartbeatInterval);
     }
 
-    public synchronized void start() {
+    public synchronized PrimeXmClientMarketDataSession start() {
         if (active) {
             throw new IllegalStateException("Already started");
         }
@@ -48,9 +48,11 @@ public final class PrimeXmClientMarketDataSession {
         fixLogger.status("Start session with " + host + ":" + port);
 
         reconnect();
+
+        return this;
     }
 
-    public synchronized void stop() {
+    public synchronized PrimeXmClientMarketDataSession stop() {
         if (!active) {
             throw new IllegalStateException("Not started");
         }
@@ -63,6 +65,19 @@ public final class PrimeXmClientMarketDataSession {
             lastChannel.close();
             lastChannel = null;
         }
+
+        return this;
+    }
+
+    // TODO: implement normal wait for stop
+    public PrimeXmClientMarketDataSession waitUntilStop() {
+        try {
+            Thread.sleep(100000000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        return this;
     }
 
     private synchronized void reconnect() {

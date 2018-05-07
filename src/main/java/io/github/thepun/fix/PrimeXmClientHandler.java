@@ -163,11 +163,10 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
             decodeTag(cursor);
             ensureTag(cursor, FixFields.BODY_LENGTH);
             decodeIntValue(cursor);
-            length = cursor.getIntValue();
-            length += 7; // include checksum
+            length = cursor.getIndex() + cursor.getIntValue() + 7; // include checksum
 
             // check we have enough bytes
-            if (cursor.getIndex() + length > cursor.getPoint()) {
+            if (length > cursor.getPoint()) {
                 buffer = in;
                 return;
             }
@@ -241,6 +240,7 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
                     default:
                         fixLogger.status("Unknown message type in session " + sessionName + ": " + msgType);
+                        // TODO: skip until end
                 }
             }
 
@@ -347,12 +347,16 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
         msgByteBuf.writerIndex(index);
 
         // send to channel
+        headerBuf.retain();
+        msgByteBuf.retain();
         ctx.write(headerBuf, promise);
         ctx.write(msgByteBuf, promise);
         ctx.flush();
 
         // log outgoing message
-        fixLogger.outgoing(headerBuf, 0, bodyLength, msgByteBuf, 0, headLength);
+        fixLogger.outgoing(headerBuf, 0, headLength, msgByteBuf, 0, bodyLength + 7);
+        headerBuf.release();
+        msgByteBuf.release();
     }
 
     private void scheduleHeartbeats(ChannelHandlerContext ctx) {

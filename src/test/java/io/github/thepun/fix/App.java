@@ -33,6 +33,7 @@ public class App {
                     MassQuote.QuoteSet quoteSet = quotes.getQuoteSet(0);
                     MassQuote.QuoteEntry entry = quoteSet.getEntry(0);
                     System.out.println("Quote(" + quoteSet.getQuoteSetId().toString() + "): bid=" + entry.getBidSpotRate() + " ask=" + entry.getOfferSpotRate());
+                    quotes.release();
                 })
                 .primeXmClient()
                 .start()

@@ -17,7 +17,9 @@ public final class MassQuote extends AbstractReferenceCounted {
     };
 
     public static MassQuote reuseOrCreate() {
-        return RECYCLER.get();
+        MassQuote massQuote = RECYCLER.get();
+        massQuote.retain();
+        return massQuote;
     }
 
 

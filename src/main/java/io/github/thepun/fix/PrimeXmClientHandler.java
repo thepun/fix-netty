@@ -168,7 +168,7 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
             // read length
             index = skipTag(in, index);
             index = decodeIntValue(in, index, value);
-            length = value.getIntValue() + index + CHECKSUM_LENGTH; // include checksum
+            length = index - start + value.getIntValue() + CHECKSUM_LENGTH; // include checksum
 
             // check we have enough bytes
             if (length > readableBytes) {
@@ -194,27 +194,28 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
                 MassQuote quotes = MassQuote.reuseOrCreate();
                 index = decodeMassQuote(in, index, value, quotes);
                 quotesListener.onMarketData(quotes);
+                if (quotes.isQuoteIdDefined()) {
+                    // TODO: implement Mass Quote Acknowledge
+                }
+                quotes.release();
             } else {
                 // slow path
                 switch (msgType) {
                     case FixMsgTypes.HEARTBEAT:
                         Heartbeat heartbeat = Heartbeat.reuseOrCreate();
-                        index = decodeHeartbeat(in, index, heartbeat);
+                        index = decodeHeartbeat(in, index, value, heartbeat);
                         // just decode it and not do anything else
+                        heartbeat.release();
                         break;
 
                     case FixMsgTypes.TEST:
                         Test test = Test.newInstance();
-                        index = decodeTest(in, index, test);
+                        index = decodeTest(in, index, value, test);
                         // send heartbeat on test message
                         Heartbeat heartbeatForTest = Heartbeat.reuseOrCreate();
-                        if (test.isTestIdDefined()) {
-                            heartbeatForTest.initBuffer(msgByteBuf);
-                            heartbeatForTest.getTestId().setAddress(test.getTestId());
-                            heartbeatForTest.setTestIdDefined(true);
-                        } else {
-                            heartbeatForTest.setTestIdDefined(false);
-                        }
+                        heartbeatForTest.initBuffer(msgByteBuf);
+                        heartbeatForTest.getTestId().setAddress(test.getTestId());
+                        heartbeatForTest.setTestIdDefined(true);
                         write(ctx, heartbeatForTest, ctx.voidPromise());
                         ctx.flush();
                         break;
@@ -245,7 +246,7 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
                     default:
                         index = skipUntilChecksum(in, index, value);
-                        fixLogger.status("Unknown message type in session " + sessionName + ": " + msgType);
+                        fixLogger.status("Unknown message type in session " + sessionName + ": " + ((char) msgType));
                 }
             }
 

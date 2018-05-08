@@ -17,6 +17,7 @@ final class FixFields {
     public static final int ENCRYPT_METHOD = 98;
     public static final int ISSUER = 106;
     public static final int HEART_BT_INT = 108;
+    public static final int TEST_REQ_ID = 112;
     public static final int QUOTE_ID = 117;
     public static final int BID_SIZE = 134;
     public static final int OFFER_SIZE = 135;

@@ -24,7 +24,6 @@ final class Test extends AbstractReferenceCounted {
     private final Recycler.Handle<Test> recyclerHandle;
 
     private ByteBuf buffer;
-    private boolean testIdDefined;
 
     private Test(Recycler.Handle<Test> recyclerHandle) {
         this.recyclerHandle = recyclerHandle;
@@ -34,14 +33,6 @@ final class Test extends AbstractReferenceCounted {
 
     OffHeapCharSequence getTestId() {
         return testId;
-    }
-
-    boolean isTestIdDefined() {
-        return testIdDefined;
-    }
-
-    void setTestIdDefined(boolean testIdDefined) {
-        this.testIdDefined = testIdDefined;
     }
 
     void initBuffer(ByteBuf buffer) {

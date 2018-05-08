@@ -268,14 +268,25 @@ final class CommonCodecUtil {
         return skipValue(in, index);
     }
 
-    static int decodeHeartbeat(ByteBuf in, int index, Heartbeat message) {
-        // TODO: implements decoding of heartbeat
-        return index;
+    static int decodeHeartbeat(ByteBuf in, int index, Value value, Heartbeat message) {
+        index = decodeTag(in, index, value);
+        int tag = value.getIntValue();
+        if (tag == FixFields.TEST_REQ_ID) {
+            decodeNativeStringValue(in, index, message.getTestId());
+            message.setTestIdDefined(true);
+
+            index = decodeTag(in, index, value);
+        }
+
+        return skipValue(in, index);
     }
 
-    static int decodeTest(ByteBuf in, int index, Test message) {
-        // TODO: implements decoding of test
-        return index;
+    static int decodeTest(ByteBuf in, int index, Value value, Test message) {
+        index = decodeTag(in, index, value);
+        decodeNativeStringValue(in, index, message.getTestId());
+
+        index = decodeTag(in, index, value);
+        return skipValue(in, index);
     }
 
     static int encodeEqualSign(ByteBuf out, int index) {
@@ -478,12 +489,16 @@ final class CommonCodecUtil {
     }
 
     static int encodeHeartbeat(ByteBuf out, int index, Heartbeat message) {
-        // TODO: implements decoding of heartbeat
+        if (message.isTestIdDefined()) {
+            index = encodeTag(out, index, FixFields.TEST_REQ_ID);
+            index = encodeStringNativeValue(out, index, message.getTestId());
+        }
         return index;
     }
 
     static int encodeTest(ByteBuf out, int index, Test message) {
-        // TODO: implements decoding of test
+        index = encodeTag(out, index, FixFields.TEST_REQ_ID);
+        index = encodeStringNativeValue(out, index, message.getTestId());
         return index;
     }
 }

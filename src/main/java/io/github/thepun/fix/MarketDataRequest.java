@@ -69,7 +69,7 @@ public final class MarketDataRequest {
     }
 
 
-    static final class RelatedSymGroup {
+    public static final class RelatedSymGroup {
 
         private String symbol;
 

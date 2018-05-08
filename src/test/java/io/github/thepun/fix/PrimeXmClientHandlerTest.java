@@ -30,7 +30,7 @@ class PrimeXmClientHandlerTest {
         EmbeddedChannel channel = new EmbeddedChannel(handler);
 
         String fix = readFixMessageFromChannel(channel);
-        assertFixMathes("8=FIX.4.4|9=104|35=A|34=0|49=qwe_|56=+--341|50=1asd|57=sdf|52=<ANY>|98=0|108=10|141=Y|553=user|554=pass|10=<ANY>|", fix);
+        assertFixMathes("8=FIX.4.4|9=<ANY>|35=A|34=1|49=qwe_|56=+--341|50=1asd|57=sdf|52=<ANY>|98=0|108=10|141=Y|553=user|554=pass|10=<ANY>|", fix);
 
         assertNull(channel.readOutbound());
     }
@@ -78,10 +78,10 @@ class PrimeXmClientHandlerTest {
         verify(readyListener, times(1)).onReady(any());
 
         String fix1 = readFixMessageFromChannel(channel);
-        assertFixMathes("8=FIX.4.4|9=105|35=V|34=1|49=qwe_|56=+--341|50=1asd|57=sdf|52=<ANY>|262=req1|263=1|264=3|146=1|55=EURUSD|10=<ANY>|", fix1);
+        assertFixMathes("8=FIX.4.4|9=<ANY>|35=V|34=2|49=qwe_|56=+--341|50=1asd|57=sdf|52=<ANY>|262=req1|263=1|264=3|146=1|55=EURUSD|10=<ANY>|", fix1);
 
         String fix2 = readFixMessageFromChannel(channel);
-        assertFixMathes("8=FIX.4.4|9=105|35=V|34=2|49=qwe_|56=+--341|50=1asd|57=sdf|52=<ANY>|262=req1|263=1|264=4|146=1|55=EURCAD|10=<ANY>|", fix2);
+        assertFixMathes("8=FIX.4.4|9=<ANY>|35=V|34=3|49=qwe_|56=+--341|50=1asd|57=sdf|52=<ANY>|262=req1|263=1|264=4|146=1|55=EURCAD|10=<ANY>|", fix2);
     }
 
     @Test

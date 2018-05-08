@@ -196,42 +196,43 @@ final class CommonCodecUtil {
     static int decodeLogon(ByteBuf in, int index, byte[] temp, Value value, Logon logon) {
         int tag;
 
-        do {
+        for (;;) {
             index = decodeTag(in, index, value);
             tag = value.getIntValue();
 
             switch (tag) {
                 case FixFields.ENCRYPT_METHOD:
-                    decodeIntValue(in, index, value);
+                    index = decodeIntValue(in, index, value);
                     logon.setEncryptMethod(value.getIntValue());
                     break;
 
                 case FixFields.HEART_BT_INT:
-                    decodeIntValue(in, index, value);
+                    index = decodeIntValue(in, index, value);
                     logon.setHeartbeatInterval(value.getIntValue());
                     break;
 
                 case FixFields.RESET_SEQ_NUM_FLAG:
-                    decodeBooleanValue(in, index, value);
+                    index = decodeBooleanValue(in, index, value);
                     logon.setResetSqNumFlag(value.getBooleanValue());
                     break;
 
                 case FixFields.USERNAME:
-                    decodeStringValue(in, index, temp, value);
+                    index = decodeStringValue(in, index, temp, value);
                     logon.setUsername(value.getStrValue());
                     break;
 
                 case FixFields.PASSWORD:
-                    decodeStringValue(in, index, temp, value);
+                    index = decodeStringValue(in, index, temp, value);
                     logon.setPassword(value.getStrValue());
                     break;
+
+                case FixFields.CHECK_SUM:
+                    return skipValue(in, index);
 
                 default:
                     index = skipValue(in, index);
             }
-        } while (tag != FixFields.CHECK_SUM);
-
-        return skipValue(in, index);
+        }
     }
 
     static int decodeLogout(ByteBuf in, int index, byte[] temp, Value value, Logout logout) {
@@ -463,11 +464,13 @@ final class CommonCodecUtil {
         return index;
     }
 
-    static void encodeHeartbeat(Cursor cursor, Heartbeat message) {
+    static int encodeHeartbeat(ByteBuf out, int index, Heartbeat message) {
         // TODO: implements decoding of heartbeat
+        return index;
     }
 
-    static void encodeTest(Cursor cursor, Test message) {
+    static int encodeTest(ByteBuf out, int index, Test message) {
         // TODO: implements decoding of test
+        return index;
     }
 }

@@ -10,11 +10,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class FixHelper {
 
-    static String readString(Cursor cursor) {
+    /*static String readString(Cursor cursor) {
         ByteBuf buffer = cursor.getBuffer();
         buffer.writerIndex(cursor.getIndex());
         return buffer.readCharSequence(buffer.readableBytes(), CharsetUtil.US_ASCII).toString().replace((char) 1, '|');
-    }
+    }*/
 
     static String readString(ByteBuf buffer) {
         return buffer.readCharSequence(buffer.readableBytes(), CharsetUtil.US_ASCII).toString().replace((char) 1, '|');
@@ -24,7 +24,9 @@ class FixHelper {
     static void assertFixMathes(String expected, String actual) {
         assertNotNull(actual);
 
-        String actualWithoutTime = actual.replaceAll("\\|52=[:\\-\\.0-9]*\\|","|52=<ANY>|")
+        String actualWithoutTime = actual
+                .replaceAll("\\|52=[:\\-\\.0-9]*\\|","|52=<ANY>|")
+                .replaceAll("\\|9=[0-9]*","|9=<ANY>")
                 .replaceAll("\\|10=[0-9]*","|10=<ANY>");
         assertEquals(expected, actualWithoutTime);
     }

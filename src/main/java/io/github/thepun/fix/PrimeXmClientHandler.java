@@ -5,6 +5,7 @@ import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.CharsetUtil;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.ScheduledFuture;
 
 import java.util.concurrent.TimeUnit;
@@ -29,6 +30,7 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
     private Value value;
     private byte[] temp;
+    private StringBuilder sb;
     private ByteBuf buffer;
     private ByteBuf sessionHeader;
     private ByteBuf beginHeader;
@@ -52,6 +54,7 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
         sequenceNumber = 1;
         value = new Value();
         temp = new byte[1024];
+        sb = new StringBuilder(1024);
 
         // begin string buffer is always the same
         ByteBuf newBeginHeader = ctx.alloc().directBuffer();
@@ -260,89 +263,80 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
         byte[] temp = this.temp;
 
         // prepare buffers
-        ByteBuf headBuf = ctx.alloc().directBuffer();
-        ByteBuf bodyBuf = ctx.alloc().directBuffer();
+        ByteBuf headBuf = ctx.alloc().directBuffer(64);
+        ByteBuf bodyBuf = ctx.alloc().directBuffer(1024);
         int headIndex = headBuf.writerIndex();
+        int headStart = headIndex;
         int bodyIndex = bodyBuf.writerIndex();
+        int bodyStart = bodyIndex;
 
         // write static header
         headBuf.writeBytes(beginHeader, 0, START_HEADER_LENGTH);
+        headIndex += START_HEADER_LENGTH;
 
         // write msg type
-        encodeTag(bodyBuf, bodyIndex, FixFields.MSG_TYPE)
+        bodyIndex = encodeTag(bodyBuf, bodyIndex, FixFields.MSG_TYPE);
         int msgTypeIndex = bodyIndex;
-        encodeDelimiter()
-        cursor.setIndex(msgTypeIndex + 2);
-        bodyBuf.setByte(msgTypeIndex + 1, 1);
+        bodyIndex = encodeDelimiter(bodyBuf, bodyIndex + 1);
 
         // write sequence number
-        cursor.setTag(FixFields.MSG_SEQ_NUM);
-        cursor.setIntValue(sequenceNumber);
-        encodeTag(cursor);
-        encodeIntValue(cursor);
-        sequenceNumber++;
+        bodyIndex = encodeTag(bodyBuf, bodyIndex, FixFields.MSG_SEQ_NUM);
+        bodyIndex = encodeIntValue(bodyBuf, bodyIndex, temp, sequenceNumber++);
 
         // write session info
-        index = cursor.getIndex();
-        sessionHeader.getBytes(0, bodyBuf, index, sessionHeaderLength);
-        cursor.setIndex(index + sessionHeaderLength);
+        sessionHeader.getBytes(0, bodyBuf, bodyIndex, sessionHeaderLength);
+        bodyIndex += sessionHeaderLength;
 
         // write sending time value
-        cursor.setLongValue(System.currentTimeMillis());
-        encodeDateTime(cursor);
+        long currentTime = System.currentTimeMillis();
+        bodyIndex = encodeDateTime(bodyBuf, bodyIndex, currentTime, sb);
 
         // write body
-        if (msg instanceof MarketDataRequest) {
-            bodyBuf.setByte(msgTypeIndex, FixMsgTypes.MARKET_DATA_REQUEST);
-
-            MarketDataRequest marketDataRequest = (MarketDataRequest) msg;
-            PrimeXmCodecUtil.encodeMarketDataRequest(cursor, marketDataRequest);
-        } else if (msg instanceof Heartbeat) {
+        if (msg instanceof Heartbeat) {
             bodyBuf.setByte(msgTypeIndex, FixMsgTypes.HEARTBEAT);
 
             Heartbeat heartbeat = (Heartbeat) msg;
-            encodeHeartbeat(cursor, heartbeat);
+            bodyIndex = encodeHeartbeat(bodyBuf, bodyIndex, heartbeat);
+            heartbeat.release();
+        } else if (msg instanceof MarketDataRequest) {
+            bodyBuf.setByte(msgTypeIndex, FixMsgTypes.MARKET_DATA_REQUEST);
+
+            MarketDataRequest marketDataRequest = (MarketDataRequest) msg;
+            bodyIndex = encodeMarketDataRequest(bodyBuf, bodyIndex, temp, value, marketDataRequest);
         } else if (msg instanceof Logon) {
             bodyBuf.setByte(msgTypeIndex, FixMsgTypes.LOGON);
 
             Logon logon = (Logon) msg;
-            encodeLogon(cursor, logon);
+            bodyIndex = encodeLogon(bodyBuf, bodyIndex, temp, logon);
         } else {
             fixLogger.status("Unknown message: " + msg.getClass().getName());
+            ReferenceCountUtil.release(msg);
+            headBuf.release();
+            bodyBuf.release();
             return;
         }
 
-        // write actual body length
-        int bodyLength = cursor.getIndex();
-        startEncoding(cursor, headBuf, temp);
-        cursor.setIndex(headBuf.writerIndex());
-        cursor.setIntValue(bodyLength);
-        encodeIntValue(cursor);
-        int headLength = cursor.getIndex();
-        headBuf.writerIndex(headLength);
+        // write actual body length and finish with head
+        int bodyLength = bodyIndex - bodyStart;
+        headIndex = encodeIntValue(headBuf, headIndex, temp, bodyLength);
+        headBuf.writerIndex(headIndex);
 
         // calculate checksum
         int sum = 0;
-        for (int i = 0; i < headLength; i++) {
+        for (int i = headStart; i < headIndex; i++) {
             byte b = headBuf.getByte(i);
             sum += b;
         }
-        for (int i = 0; i < bodyLength; i++) {
+        for (int i = bodyStart; i < bodyIndex; i++) {
             byte b = bodyBuf.getByte(i);
             sum += b;
         }
         sum %= 256;
 
-        // write checksum and finish
-        startEncoding(cursor, bodyBuf, temp);
-        cursor.setIndex(bodyLength);
-        cursor.setTag(FixFields.CHECK_SUM);
-        cursor.setIntValue(sum);
-        encodeTag(cursor);
-        index = cursor.getIndex();
-        index = encodeThreeDigitInt(bodyBuf, index, sum);
-        index = encodeDelimiter(bodyBuf, index);
-        bodyBuf.writerIndex(index);
+        // write checksum and finish with body
+        bodyIndex = encodeTag(bodyBuf, bodyIndex, FixFields.CHECK_SUM);
+        bodyIndex = encodeIntValue(bodyBuf, bodyIndex, temp, sum);
+        bodyBuf.writerIndex(bodyIndex);
 
         // send to channel
         headBuf.retain();
@@ -352,7 +346,7 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
         ctx.flush();
 
         // log outgoing message
-        fixLogger.outgoing(headBuf, 0, headLength, bodyBuf, 0, bodyLength + 7);
+        fixLogger.outgoing(headBuf, headStart, headIndex, bodyBuf, bodyStart, bodyIndex);
         headBuf.release();
         bodyBuf.release();
     }

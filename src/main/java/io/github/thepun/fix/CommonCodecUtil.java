@@ -424,6 +424,7 @@ final class CommonCodecUtil {
     static int encodeDateTime(ByteBuf out, int index, long dateTime, StringBuilder sb) {
         DATE_TIME.formatTo(Instant.ofEpochMilli(dateTime).atZone(GMT), sb);
         index += out.setCharSequence(index, sb, CharsetUtil.US_ASCII);
+        sb.setLength(0);
 
         // set delimiter
         index = encodeDelimiter(out, index);

@@ -103,7 +103,12 @@ public final class PrimeXmClientMarketDataSession {
 
     private synchronized void onDisconnect(Future<? super Void> f) {
         if (active) {
-            fixLogger.status("Scheduling reconnect to " + host + ":" + port);
+            if (f.cause() != null) {
+                fixLogger.status("Disconnected from " + host + ":" + port + ": " + f.cause().getMessage());
+            } else {
+                fixLogger.status("Disconnected from " + host + ":" + port);
+            }
+
             executor.schedule(this::reconnect, reconnectInterval, TimeUnit.SECONDS);
 
             if (disconnectListener != null) {
@@ -120,8 +125,10 @@ public final class PrimeXmClientMarketDataSession {
                 if (connectListener != null) {
                     connectListener.onConnnect();
                 }
-            } else {
+            } else if (f.cause() != null) {
                 fixLogger.status("Connection to " + host + ":" + port + " failed: " + f.cause().getMessage());
+            } else {
+                fixLogger.status("Connection to " + host + ":" + port + " failed");
             }
         }
     }

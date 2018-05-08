@@ -15,8 +15,9 @@ import static io.github.thepun.fix.PrimeXmCodecUtil.*;
 
 final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
-    private static final String START_HEADER = "8=FIX.4.4" + ((char)1) + "9=";
-    private static final int START_HEADER_LENGTH = START_HEADER.length();
+    private static final String START_HEADER_1 = "8=FIX.4.4";
+    private static final String START_HEADER_2 = "9=";
+    private static final int START_HEADER_LENGTH = START_HEADER_1.length() + START_HEADER_2.length() + 1;
     private static final int BEGIN_STRING_LENGTH = 10;
     private static final int CHECKSUM_LENGTH = 7;
 
@@ -58,7 +59,9 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
         // begin string buffer is always the same
         ByteBuf newBeginHeader = ctx.alloc().directBuffer();
-        newBeginHeader.writeCharSequence(START_HEADER, CharsetUtil.US_ASCII);
+        newBeginHeader.writeCharSequence(START_HEADER_1, CharsetUtil.US_ASCII);
+        newBeginHeader.writeByte(1);
+        newBeginHeader.writeCharSequence(START_HEADER_2, CharsetUtil.US_ASCII);
         beginHeader = newBeginHeader;
 
         // session header is also always the same
@@ -335,7 +338,8 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
         // write checksum and finish with body
         bodyIndex = encodeTag(bodyBuf, bodyIndex, FixFields.CHECK_SUM);
-        bodyIndex = encodeIntValue(bodyBuf, bodyIndex, temp, sum);
+        bodyIndex = encodeThreeDigitInt(bodyBuf, bodyIndex, sum);
+        bodyIndex = encodeDelimiter(bodyBuf, bodyIndex);
         bodyBuf.writerIndex(bodyIndex);
 
         // send to channel

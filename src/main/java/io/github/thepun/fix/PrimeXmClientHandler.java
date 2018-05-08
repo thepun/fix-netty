@@ -244,7 +244,7 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
                         break;
 
                     default:
-                        index = skipUntilChecksum(in, index);
+                        index = skipUntilChecksum(in, index, value);
                         fixLogger.status("Unknown message type in session " + sessionName + ": " + msgType);
                 }
             }

@@ -159,6 +159,58 @@ final class PrimeXmCodecUtil {
         return skipValue(in, index);
     }
 
+   /* static void decodeMarketDataSnapshotFullRefresh(ByteBuf in, int index, byte[] temp, Value value, MarketDataSnapshotFullRefresh message) {
+        message.initBuffer(in);
+
+        // req id
+        decodeTag(cursor);
+        ensureTag(cursor, FixFields.MD_REQ_ID);
+        decodeNativeStringValue(cursor);
+        message.getMdReqID().setAddress(cursor.getStrStart(), cursor.getStrLength());
+
+        // symbol
+        decodeTag(cursor);
+        ensureTag(cursor, FixFields.SYMBOL);
+        decodeNativeStringValue(cursor);
+        message.getSymbol().setAddress(cursor.getStrStart(), cursor.getStrLength());
+
+        // count of MD entries
+        decodeTag(cursor);
+        ensureTag(cursor, FixFields.NO_MD_ENTRIES);
+        decodeIntValue(cursor);
+        int mdEntriesCount = cursor.getIntValue();
+        message.initEntries(mdEntriesCount);
+
+        // MD entry loop
+        for (int i = 0; i < mdEntriesCount; i++) {
+            MarketDataSnapshotFullRefresh.MDEntry entry = message.getEntry(i);
+
+            // type
+            decodeTag(cursor);
+            ensureTag(cursor, FixFields.MD_ENTRY_TYPE);
+            decodeIntValue(cursor);
+            entry.setMdEntryType(cursor.getIntValue());
+
+            // id
+            decodeTag(cursor);
+            ensureTag(cursor, FixFields.MD_ENTRY_ID);
+            decodeNativeStringValue(cursor);
+            entry.getId().setAddress(cursor.getStrStart(), cursor.getStrLength());
+
+            // price
+            decodeTag(cursor);
+            ensureTag(cursor, FixFields.MD_ENTRY_PX);
+            decodeDoubleValue(cursor);
+            entry.setMdEntryPX(cursor.getDoubleValue());
+
+            // volume
+            decodeTag(cursor);
+            ensureTag(cursor, FixFields.MD_ENTRY_SIZE);
+            decodeDoubleValue(cursor);
+            entry.setMdEntrySize(cursor.getDoubleValue());
+        }
+    }*/
+
     static int decodeMarketDataRequest(ByteBuf in, int index, Value value, MarketDataRequest message) {
        // TODO: implements decoding of market data request
         return index;

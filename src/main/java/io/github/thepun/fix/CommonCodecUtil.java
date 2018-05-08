@@ -60,9 +60,21 @@ final class CommonCodecUtil {
         return index;
     }
 
-    static int skipUntilChecksum(ByteBuf in, int index) {
-        // TODO: implement skip until checksum
-        return index;
+    static int skipUntilChecksum(ByteBuf in, int index, Value value) {
+        int tag;
+
+        for (;;) {
+            index = decodeTag(in, index, value);
+            tag = value.getIntValue();
+
+            switch (tag) {
+                case FixFields.CHECK_SUM:
+                    return skipValue(in, index);
+
+                default:
+                    index = skipValue(in, index);
+            }
+        }
     }
 
     static int decodeTag(ByteBuf in, int index, Value value) {

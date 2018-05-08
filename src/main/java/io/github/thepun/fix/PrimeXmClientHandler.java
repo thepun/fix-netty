@@ -9,13 +9,15 @@ import io.netty.util.concurrent.ScheduledFuture;
 
 import java.util.concurrent.TimeUnit;
 
-import static io.github.thepun.fix.DecodingUtil.*;
-import static io.github.thepun.fix.EncodingUtil.*;
+import static io.github.thepun.fix.CommonCodecUtil.*;
+import static io.github.thepun.fix.PrimeXmCodecUtil.*;
 
 final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
-    private static final String BEGIN_HEADER = "8=FIX.4.4" + ((char)1) + "9=";
-    private static final int BEGIN_HEADER_LENGTH = BEGIN_HEADER.length();
+    private static final String START_HEADER = "8=FIX.4.4" + ((char)1) + "9=";
+    private static final int START_HEADER_LENGTH = START_HEADER.length();
+    private static final int BEGIN_STRING_LENGTH = 10;
+    private static final int CHECKSUM_LENGTH = 7;
 
 
     private final int heartbeatInterval;
@@ -25,12 +27,13 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
     private final MarketDataReadyListener readyListener;
     private final MarketDataQuotesListener quotesListener;
 
+    private Value value;
+    private byte[] temp;
     private ByteBuf buffer;
     private ByteBuf sessionHeader;
     private ByteBuf beginHeader;
     private ByteBuf bodyLengthHeader;
     private String sessionName;
-    private byte[] heapBuffer;
 
     private int sequenceNumber;
     private int sessionHeaderLength;
@@ -47,13 +50,12 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
         sequenceNumber = 1;
-
-        // temp heap buffer
-        heapBuffer = new byte[1024];
+        value = new Value();
+        temp = new byte[1024];
 
         // begin string buffer is always the same
         ByteBuf newBeginHeader = ctx.alloc().directBuffer();
-        newBeginHeader.writeCharSequence(BEGIN_HEADER, CharsetUtil.US_ASCII);
+        newBeginHeader.writeCharSequence(START_HEADER, CharsetUtil.US_ASCII);
         beginHeader = newBeginHeader;
 
         // session header is also always the same
@@ -116,9 +118,12 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
     // TODO: ensure on error buffers will not leak
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
+        Value value = this.value;
+        byte[] temp = this.temp;
+
         ByteBuf msgByteBuf = (ByteBuf) msg;
 
-        int index, start, length, msgType;
+        int index, start, count, length, msgType;
 
         // check if we should read from buffer first
         ByteBuf in;
@@ -144,29 +149,23 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
             in = msgByteBuf;
         }
 
-        // prepare cursor object
-        Cursor cursor = new Cursor();
-        startDecoding(cursor, in, heapBuffer);
-
         // read until the end
-        index = cursor.getIndex();
-        while (index < cursor.getPoint()) {
+        int readableBytes = in.readableBytes();
+        while (readableBytes > 0) {
             // remember message start
+            index = in.readerIndex();
             start = index;
 
-            // read fix
-            decodeTag(cursor);
-            ensureTag(cursor, FixFields.BEGIN_STRING);
-            cursor.setIndex(cursor.getIndex() + 8);
+            // skip the beginning
+            index += BEGIN_STRING_LENGTH;
 
             // read length
-            decodeTag(cursor);
-            ensureTag(cursor, FixFields.BODY_LENGTH);
-            decodeIntValue(cursor);
-            length = cursor.getIndex() + cursor.getIntValue() + 7; // include checksum
+            index = skipTag(in, index);
+            index = decodeIntValue(in, index, value);
+            length = value.getIntValue() + index + CHECKSUM_LENGTH; // include checksum
 
             // check we have enough bytes
-            if (length > cursor.getPoint()) {
+            if (length > readableBytes) {
                 buffer = in;
                 return;
             }
@@ -175,34 +174,34 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
             fixLogger.incoming(in, start, length);
 
             // read message type
-            decodeTag(cursor);
-            ensureTag(cursor, FixFields.MSG_TYPE);
-            decodeStringValueAsInt(cursor);
-            msgType = cursor.getIntValue();
+            index = skipTag(in, index);
+            index = decodeStringValueAsInt(in, index, value);
+            msgType = value.getIntValue();
+
             // TODO: read header in fixed order
             // skip rest header fields
-            skipHeader(cursor);
+            index = skipHeader(in, index);
 
             // read message content
             if (msgType == FixMsgTypes.MASS_QUOTE) {
                 // fast path
                 MassQuote quotes = MassQuote.reuseOrCreate();
-                decodeMassQuote(cursor, quotes);
+                index = decodeMassQuote(in, index, value, quotes);
                 quotesListener.onMarketData(quotes);
             } else {
                 // slow path
                 switch (msgType) {
                     case FixMsgTypes.HEARTBEAT:
-                        Heartbeat heartbeat = Heartbeat.newInstance();
-                        decodeHeartbeat(cursor, heartbeat);
+                        Heartbeat heartbeat = Heartbeat.reuseOrCreate();
+                        index = decodeHeartbeat(in, index, heartbeat);
                         // just decode it and not do anything else
                         break;
 
                     case FixMsgTypes.TEST:
                         Test test = Test.newInstance();
-                        decodeTest(cursor, test);
+                        index = decodeTest(in, index, test);
                         // send heartbeat on test message
-                        Heartbeat heartbeatForTest = Heartbeat.newInstance();
+                        Heartbeat heartbeatForTest = Heartbeat.reuseOrCreate();
                         if (test.isTestIdDefined()) {
                             heartbeatForTest.initBuffer(msgByteBuf);
                             heartbeatForTest.getTestId().setAddress(test.getTestId());
@@ -216,13 +215,13 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
                     case FixMsgTypes.MARKET_DATA_REJECT:
                         MarketDataRequestReject reject = new MarketDataRequestReject();
-                        decodeMarketDataRequestReject(cursor, reject);
+                        index = decodeMarketDataRequestReject(in, index, temp, value, reject);
                         fixLogger.status("Market data request with id " + reject.getMdReqID() + " in session " + sessionName + " was rejected: " + reject.getText());
                         break;
 
                     case FixMsgTypes.LOGON:
                         Logon logon = new Logon();
-                        decodeLogon(cursor, logon);
+                        index = decodeLogon(in, index, temp, value, logon);
                         fixLogger.status("Received logon in session " + sessionName);
                         scheduleHeartbeats(ctx);
                         SubscriptionSender subscriptionSender = new SubscriptionSender(ctx.channel());
@@ -232,21 +231,21 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
                     case FixMsgTypes.LOGOUT:
                         Logout logout = new Logout();
-                        decodeLogout(cursor, logout);
+                        index = decodeLogout(in, index, temp, value, logout);
                         fixLogger.status("Received logout in session " + sessionName);
                         cancelHeartbeats();
                         ctx.close();
                         break;
 
                     default:
+                        index = skipUntilChecksum(in, index);
                         fixLogger.status("Unknown message type in session " + sessionName + ": " + msgType);
-                        // TODO: skip until end
                 }
             }
 
-            // skip checksum and change buffer position
-            index = cursor.getIndex() + 7;
+            // change buffer position
             in.readerIndex(index);
+            readableBytes = in.readableBytes();
         }
 
         // we finished reading from message or buffer fully
@@ -257,25 +256,24 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
     // TODO: ensure on error buffers will not leak
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
-        int index;
+        Value value = this.value;
+        byte[] temp = this.temp;
 
         // prepare buffers
-        ByteBuf headerBuf = ctx.alloc().directBuffer();
-        ByteBuf msgByteBuf = ctx.alloc().directBuffer();
+        ByteBuf headBuf = ctx.alloc().directBuffer();
+        ByteBuf bodyBuf = ctx.alloc().directBuffer();
+        int headIndex = headBuf.writerIndex();
+        int bodyIndex = bodyBuf.writerIndex();
 
         // write static header
-        headerBuf.writeBytes(beginHeader, 0, BEGIN_HEADER_LENGTH);
-
-        // prepare cursor
-        Cursor cursor = new Cursor();
-        startEncoding(cursor, msgByteBuf, heapBuffer);
+        headBuf.writeBytes(beginHeader, 0, START_HEADER_LENGTH);
 
         // write msg type
-        cursor.setTag(FixFields.MSG_TYPE);
-        encodeTag(cursor);
-        int msgTypeIndex = cursor.getIndex();
+        encodeTag(bodyBuf, bodyIndex, FixFields.MSG_TYPE)
+        int msgTypeIndex = bodyIndex;
+        encodeDelimiter()
         cursor.setIndex(msgTypeIndex + 2);
-        msgByteBuf.setByte(msgTypeIndex + 1, 1);
+        bodyBuf.setByte(msgTypeIndex + 1, 1);
 
         // write sequence number
         cursor.setTag(FixFields.MSG_SEQ_NUM);
@@ -286,7 +284,7 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
         // write session info
         index = cursor.getIndex();
-        sessionHeader.getBytes(0, msgByteBuf, index, sessionHeaderLength);
+        sessionHeader.getBytes(0, bodyBuf, index, sessionHeaderLength);
         cursor.setIndex(index + sessionHeaderLength);
 
         // write sending time value
@@ -295,17 +293,17 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
         // write body
         if (msg instanceof MarketDataRequest) {
-            msgByteBuf.setByte(msgTypeIndex, FixMsgTypes.MARKET_DATA_REQUEST);
+            bodyBuf.setByte(msgTypeIndex, FixMsgTypes.MARKET_DATA_REQUEST);
 
             MarketDataRequest marketDataRequest = (MarketDataRequest) msg;
-            encodeMarketDataRequest(cursor, marketDataRequest);
+            PrimeXmCodecUtil.encodeMarketDataRequest(cursor, marketDataRequest);
         } else if (msg instanceof Heartbeat) {
-            msgByteBuf.setByte(msgTypeIndex, FixMsgTypes.HEARTBEAT);
+            bodyBuf.setByte(msgTypeIndex, FixMsgTypes.HEARTBEAT);
 
             Heartbeat heartbeat = (Heartbeat) msg;
             encodeHeartbeat(cursor, heartbeat);
         } else if (msg instanceof Logon) {
-            msgByteBuf.setByte(msgTypeIndex, FixMsgTypes.LOGON);
+            bodyBuf.setByte(msgTypeIndex, FixMsgTypes.LOGON);
 
             Logon logon = (Logon) msg;
             encodeLogon(cursor, logon);
@@ -316,52 +314,59 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
         // write actual body length
         int bodyLength = cursor.getIndex();
-        startEncoding(cursor, headerBuf, heapBuffer);
-        cursor.setIndex(headerBuf.writerIndex());
+        startEncoding(cursor, headBuf, temp);
+        cursor.setIndex(headBuf.writerIndex());
         cursor.setIntValue(bodyLength);
         encodeIntValue(cursor);
         int headLength = cursor.getIndex();
-        headerBuf.writerIndex(headLength);
+        headBuf.writerIndex(headLength);
 
         // calculate checksum
         int sum = 0;
         for (int i = 0; i < headLength; i++) {
-            byte b = headerBuf.getByte(i);
+            byte b = headBuf.getByte(i);
             sum += b;
         }
         for (int i = 0; i < bodyLength; i++) {
-            byte b = msgByteBuf.getByte(i);
+            byte b = bodyBuf.getByte(i);
             sum += b;
         }
         sum %= 256;
 
         // write checksum and finish
-        startEncoding(cursor, msgByteBuf, heapBuffer);
+        startEncoding(cursor, bodyBuf, temp);
         cursor.setIndex(bodyLength);
         cursor.setTag(FixFields.CHECK_SUM);
         cursor.setIntValue(sum);
         encodeTag(cursor);
         index = cursor.getIndex();
-        index = encodeThreeDigitInt(msgByteBuf, index, sum);
-        index = encodeDelimiter(msgByteBuf, index);
-        msgByteBuf.writerIndex(index);
+        index = encodeThreeDigitInt(bodyBuf, index, sum);
+        index = encodeDelimiter(bodyBuf, index);
+        bodyBuf.writerIndex(index);
 
         // send to channel
-        headerBuf.retain();
-        msgByteBuf.retain();
-        ctx.write(headerBuf, promise);
-        ctx.write(msgByteBuf, promise);
+        headBuf.retain();
+        bodyBuf.retain();
+        ctx.write(headBuf, promise);
+        ctx.write(bodyBuf, promise);
         ctx.flush();
 
         // log outgoing message
-        fixLogger.outgoing(headerBuf, 0, headLength, msgByteBuf, 0, bodyLength + 7);
-        headerBuf.release();
-        msgByteBuf.release();
+        fixLogger.outgoing(headBuf, 0, headLength, bodyBuf, 0, bodyLength + 7);
+        headBuf.release();
+        bodyBuf.release();
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        super.exceptionCaught(ctx, cause);
+
+        // TODO: process exception in channel
     }
 
     private void scheduleHeartbeats(ChannelHandlerContext ctx) {
         heartbeatSchedule = ctx.executor().schedule(() -> {
-            Heartbeat heartbeatForTest = Heartbeat.newInstance();
+            Heartbeat heartbeatForTest = Heartbeat.reuseOrCreate();
             heartbeatForTest.setTestIdDefined(false);
             write(ctx, heartbeatForTest, ctx.voidPromise());
             ctx.flush();

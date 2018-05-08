@@ -1,22 +1,23 @@
 package io.github.thepun.fix;
 
-import io.github.thepun.unsafe.chars.OffHeapCharSequence;
-
 final class MarketDataRequestReject {
 
-    private final OffHeapCharSequence mdReqID;
-    private final OffHeapCharSequence text;
+    private String mdReqID;
+    private String text;
 
-    MarketDataRequestReject() {
-        mdReqID = new OffHeapCharSequence();
-        text = new OffHeapCharSequence();
-    }
-
-    OffHeapCharSequence getMdReqID() {
+    public String getMdReqID() {
         return mdReqID;
     }
 
-    OffHeapCharSequence getText() {
+    public void setMdReqID(String mdReqID) {
+        this.mdReqID = mdReqID;
+    }
+
+    public String getText() {
         return text;
+    }
+
+    public void setText(String text) {
+        this.text = text;
     }
 }

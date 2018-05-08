@@ -24,14 +24,14 @@ class EncodingUtilTest {
         ByteBuf buffer = Unpooled.directBuffer(1024);
         cursor = new Cursor();
         cursor.setTemp(new byte[1024]);
-        DecodingUtil.startDecoding(cursor, buffer, temp);
+        CommonCodecUtil.startDecoding(cursor, buffer, temp);
     }
 
     @ParameterizedTest
     @ValueSource(ints = {1, 3, 45, 10, 99, 100, 456, 999})
     void encodeTag(int tag) {
         cursor.setTag(tag);
-        EncodingUtil.encodeTag(cursor);
+        CommonCodecUtil.encodeTag(cursor);
         assertEquals(tag + "=", FixHelper.readString(cursor));
     }
 
@@ -39,7 +39,7 @@ class EncodingUtilTest {
     @ValueSource(ints = {0, 1, 9, 10, 345, Integer.MAX_VALUE, -1, -9, -10, -457, Integer.MIN_VALUE + 1})
     void encodeInt(int value) {
         cursor.setIntValue(value);
-        EncodingUtil.encodeIntValue(cursor);
+        CommonCodecUtil.encodeIntValue(cursor);
         assertEquals(value + "|", FixHelper.readString(cursor));
     }
 
@@ -51,7 +51,7 @@ class EncodingUtilTest {
     void encodeDouble(double value) {
         NumberFormat format = new DecimalFormat("0.0#########");
         cursor.setDoubleValue(value);
-        EncodingUtil.encodeDoubleValue(cursor);
+        CommonCodecUtil.encodeDoubleValue(cursor);
         assertEquals(format.format(value) + "|", FixHelper.readString(cursor));
     }
 
@@ -63,7 +63,7 @@ class EncodingUtilTest {
         string.writeCharSequence(value, CharsetUtil.US_ASCII);
         cursor.setStrStart(string.memoryAddress() + string.readerIndex());
         cursor.setStrLength(string.readableBytes());
-        EncodingUtil.encodeStringNativeValue(cursor);
+        CommonCodecUtil.encodeStringNativeValue(cursor);
         assertEquals(value + "|", FixHelper.readString(cursor));
     }
 
@@ -79,7 +79,7 @@ class EncodingUtilTest {
         marketDataRequest.getRelatedSym(1).setSymbol("EURCAD_");
         marketDataRequest.getRelatedSym(2).setSymbol("XYZ");
 
-        EncodingUtil.encodeMarketDataRequest(cursor, marketDataRequest);
+        PrimeXmCodecUtil.encodeMarketDataRequest(cursor, marketDataRequest);
         assertEquals("262=asdfghrty|263=1|264=99|146=3|55=EURUSD|55=EURCAD_|55=XYZ|", FixHelper.readString(cursor));
     }
 

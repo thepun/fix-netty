@@ -14,14 +14,14 @@ import java.text.NumberFormat;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class DecodingUtilTest {
+class CommonCodecUtilTest {
 
     @Test
     void decodeTag() {
         String fix = "2233=";
 
         Cursor cursor = prepareCursor(fix);
-        DecodingUtil.decodeTag(cursor);
+        CommonCodecUtil.decodeTag(cursor);
         assertEquals(2233, cursor.getTag());
     }
 
@@ -30,7 +30,7 @@ class DecodingUtilTest {
     @ValueSource(ints = {0, 1, 9, 10, 345, Integer.MAX_VALUE, -1, -9, -10, - 4356, Integer.MIN_VALUE})
     void decodeInt(int value) {
         Cursor cursor = prepareCursor(value + "|");
-        DecodingUtil.decodeIntValue(cursor);
+        CommonCodecUtil.decodeIntValue(cursor);
         assertEquals(value, cursor.getIntValue());
     }
 
@@ -45,7 +45,7 @@ class DecodingUtilTest {
         String fix = format.format(value) + "|";
 
         Cursor cursor = prepareCursor(fix);
-        DecodingUtil.decodeDoubleValue(cursor);
+        CommonCodecUtil.decodeDoubleValue(cursor);
         assertEquals(value, cursor.getDoubleValue());
     }
 
@@ -56,7 +56,7 @@ class DecodingUtilTest {
         String fix = value + "|";
 
         Cursor cursor = prepareCursor(fix);
-        DecodingUtil.decodeNativeStringValue(cursor);
+        CommonCodecUtil.decodeNativeStringValue(cursor);
         OffHeapCharSequence str = new OffHeapCharSequence(cursor.getStrStart(), cursor.getStrLength());
         assertEquals(value, str.toString());
     }
@@ -66,7 +66,7 @@ class DecodingUtilTest {
         String fix = "98=1|108=30|141=Y|553=name_q|554=password_q|";
 
         Logon logon = new Logon();
-        DecodingUtil.decodeLogon(prepareCursor(fix), logon);
+        CommonCodecUtil.decodeLogon(prepareCursor(fix), logon);
 
         assertTrue(logon.isResetSqNumFlag());
         assertEquals(1, logon.getEncryptMethod());
@@ -80,7 +80,7 @@ class DecodingUtilTest {
         String fix = "58=dfgewrttyucgvcvbsd wertxcg dsfge|";
 
         Logout logout = new Logout();
-        DecodingUtil.decodeLogout(prepareCursor(fix), logout);
+        CommonCodecUtil.decodeLogout(prepareCursor(fix), logout);
 
         assertEquals("dfgewrttyucgvcvbsd wertxcg dsfge", logout.getText());
     }
@@ -90,7 +90,7 @@ class DecodingUtilTest {
         String fix = "296=1|302=43|295=1|299=0|106=1|134=1000000|135=50000|188=186.129|190=186.14|299=1|10=132|";
 
         MassQuote massQuote = MassQuote.reuseOrCreate();
-        DecodingUtil.decodeMassQuote(prepareCursor(fix), massQuote);
+        PrimeXmCodecUtil.decodeMassQuote(prepareCursor(fix), massQuote);
 
         assertFalse(massQuote.isQuoteIdDefined());
         assertEquals(1, massQuote.getQuoteSetCount());
@@ -125,7 +125,7 @@ class DecodingUtilTest {
         ByteBuf buffer = Unpooled.directBuffer(fix.length());
         buffer.writeBytes(fix.replace('|', (char) 1).getBytes(CharsetUtil.US_ASCII));
         Cursor cursor = new Cursor();
-        DecodingUtil.startDecoding(cursor, buffer, temp);
+        CommonCodecUtil.startDecoding(cursor, buffer, temp);
         return cursor;
     }
 }

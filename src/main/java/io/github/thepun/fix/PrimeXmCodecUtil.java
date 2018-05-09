@@ -2,10 +2,11 @@ package io.github.thepun.fix;
 
 import io.netty.buffer.ByteBuf;
 
-import static io.github.thepun.fix.CommonCodecUtil.*;
+import static io.github.thepun.fix.PrimitiveCodecUtil.*;
 
 final class PrimeXmCodecUtil {
 
+    // TODO: introduce fixed field order
     static int skipHeader(ByteBuf in, int index) {
         int lastIndex;
         int tagNum = 0;
@@ -57,7 +58,7 @@ final class PrimeXmCodecUtil {
 
         // optional quote id
         if (tag == FixFields.QUOTE_ID) {
-            index = decodeNativeStringValue(in, index, message.getQuoteId());
+            index = decodeStringNativeValue(in, index, message.getQuoteId());
             message.setQuoteIdDefined(true);
 
             index = decodeTag(in, index, value);
@@ -81,7 +82,7 @@ final class PrimeXmCodecUtil {
 
             // quote set id
             ensureTag(tag, FixFields.QUOTE_SET_ID);
-            index = decodeNativeStringValue(in, index, quoteSet.getQuoteSetId());
+            index = decodeStringNativeValue(in, index, quoteSet.getQuoteSetId());
             quoteSet.setQuoteSetIdDefined(true);
 
             // count of quote entries
@@ -102,7 +103,7 @@ final class PrimeXmCodecUtil {
 
                 // quote entry id
                 ensureTag(tag, FixFields.QUOTE_ENTRY_ID);
-                index = decodeNativeStringValue(in, index, entry.getQuoteEntryId());
+                index = decodeStringNativeValue(in, index, entry.getQuoteEntryId());
                 entry.setQuoteEntryIdDefined(true);
 
                 // one tag in future
@@ -111,13 +112,14 @@ final class PrimeXmCodecUtil {
 
                 // optional issuer
                 if (tag == FixFields.ISSUER) {
-                    index = decodeNativeStringValue(in, index, entry.getIssuer());
+                    index = decodeStringNativeValue(in, index, entry.getIssuer());
                     entry.setIssuerDefined(true);
 
                     index = decodeTag(in, index, value);
                     tag = value.getIntValue();
                 }
 
+                // TODO: check if possible to do fixed field order in quote entry
                 // values
                 entryTags:
                 for (;;) {
@@ -159,125 +161,115 @@ final class PrimeXmCodecUtil {
         return skipValue(in, index);
     }
 
-   /* static void decodeMarketDataSnapshotFullRefresh(ByteBuf in, int index, byte[] temp, Value value, MarketDataSnapshotFullRefresh message) {
+    static int decodeMarketDataSnapshotFullRefresh(ByteBuf in, int index, Value value, MarketDataSnapshotFullRefresh message) {
         message.initBuffer(in);
 
         // req id
-        decodeTag(cursor);
-        ensureTag(cursor, FixFields.MD_REQ_ID);
-        decodeNativeStringValue(cursor);
-        message.getMdReqID().setAddress(cursor.getStrStart(), cursor.getStrLength());
+        index = decodeTag(in, index, value);
+        index = decodeStringNativeValue(in, index, message.getMdReqId());
+        message.setMdReqIdDefined(true);
 
         // symbol
-        decodeTag(cursor);
-        ensureTag(cursor, FixFields.SYMBOL);
-        decodeNativeStringValue(cursor);
-        message.getSymbol().setAddress(cursor.getStrStart(), cursor.getStrLength());
+        index = decodeTag(in, index, value);
+        index = decodeStringNativeValue(in, index, message.getSymbol());
+        message.setSymbolDefined(true);
 
         // count of MD entries
-        decodeTag(cursor);
-        ensureTag(cursor, FixFields.NO_MD_ENTRIES);
-        decodeIntValue(cursor);
-        int mdEntriesCount = cursor.getIntValue();
+        index = decodeTag(in, index, value);
+        index = decodeIntValue(in, index, value);
+        int mdEntriesCount = value.getIntValue();
         message.initEntries(mdEntriesCount);
 
         // MD entry loop
         for (int i = 0; i < mdEntriesCount; i++) {
             MarketDataSnapshotFullRefresh.MDEntry entry = message.getEntry(i);
+            entry.setSymbolDefined(false);
+            entry.setCurrencyDefined(false);
 
             // type
-            decodeTag(cursor);
-            ensureTag(cursor, FixFields.MD_ENTRY_TYPE);
-            decodeIntValue(cursor);
-            entry.setMdEntryType(cursor.getIntValue());
+            index = decodeTag(in, index, value);
+            index = decodeIntValue(in, index, value);
+            entry.setMdEntryType(value.getIntValue());
 
             // id
-            decodeTag(cursor);
-            ensureTag(cursor, FixFields.MD_ENTRY_ID);
-            decodeNativeStringValue(cursor);
-            entry.getId().setAddress(cursor.getStrStart(), cursor.getStrLength());
+            index = decodeTag(in, index, value);
+            index = decodeStringNativeValue(in, index, entry.getId());
+            entry.setIdDefined(true);
 
             // price
-            decodeTag(cursor);
-            ensureTag(cursor, FixFields.MD_ENTRY_PX);
-            decodeDoubleValue(cursor);
-            entry.setMdEntryPX(cursor.getDoubleValue());
+            index = decodeTag(in, index, value);
+            index = decodeDoubleValue(in, index, value);
+            entry.setMdEntryPX(value.getDoubleValue());
 
             // volume
-            decodeTag(cursor);
-            ensureTag(cursor, FixFields.MD_ENTRY_SIZE);
-            decodeDoubleValue(cursor);
-            entry.setMdEntrySize(cursor.getDoubleValue());
-        }
-    }*/
-
-    static int decodeMarketDataRequest(ByteBuf in, int index, Value value, MarketDataRequest message) {
-       // TODO: implements decoding of market data request
-        return index;
-    }
-
-    static int decodeMarketDataRequestReject(ByteBuf in, int index, byte[] temp, Value value, MarketDataRequestReject message) {
-        int tag;
-
-        do {
             index = decodeTag(in, index, value);
-            tag = value.getIntValue();
-
-            switch (tag) {
-                case FixFields.MD_REQ_ID:
-                    decodeStringValue(in, index, temp, value);
-                    message.setMdReqID(value.getStrValue());
-                    break;
-
-                case FixFields.TEXT:
-                    decodeStringValue(in, index, temp, value);
-                    message.setText(value.getStrValue());
-                    break;
-
-                default:
-                    index = skipValue(in, index);
-            }
-        } while (tag != FixFields.CHECK_SUM);
-
-        return skipValue(in, index);
-    }
-
-    static int encodeMassQuote(ByteBuf out, int index, Value value, MassQuote message) {
-        // TODO: implement mass quote encoding
-        return index;
-    }
-
-    static int encodeMarketDataRequest(ByteBuf out, int index, byte[] temp, Value value, MarketDataRequest message) {
-        // md req id
-        index = encodeTag(out, index, FixFields.MD_REQ_ID);
-        index = encodeStringValue(out, index, message.getMdReqId());
-
-        // subscription request type
-        index = encodeTag(out, index, FixFields.SUBSCRIPTION_REQUEST_TYPE);
-        index = encodeIntValue(out, index, temp, message.getSubscriptionRequestType());
-
-        // market depth
-        index = encodeTag(out, index, FixFields.MARKET_DEPTH);
-        index = encodeIntValue(out, index, temp, message.getMarketDepth());
-
-        // no related sym
-        index = encodeTag(out, index, FixFields.NO_RELATED_SYM);
-        index = encodeIntValue(out, index, temp, message.getRelatedSymsCount());
-
-        // related sym loop
-        for (int i = 0; i < message.getRelatedSymsCount(); i++) {
-            MarketDataRequest.RelatedSymGroup relatedSym = message.getRelatedSym(i);
-
-            // symbol
-            index = encodeTag(out, index, FixFields.SYMBOL);
-            index = encodeStringValue(out, index, relatedSym.getSymbol());
+            index = decodeDoubleValue(in, index, value);
+            entry.setMdEntrySize(value.getDoubleValue());
         }
 
         return index;
     }
 
-    static void encodeMarketDataRequestReject(ByteBuf in, int index, Value value, MarketDataRequestReject message) {
-        // TODO: implement market data request reject encoding
+    static int encodeMassQuote(ByteBuf out, int index, byte[] temp, MassQuote message) {
+        // quote id
+        if (message.isQuoteIdDefined()) {
+            index = encodeTag(out, index, FixFields.QUOTE_ID);
+            index = encodeStringNativeValue(out, index, message.getQuoteId());
+        }
+
+        // number of quote sets
+        index = encodeTag(out, index, FixFields.NO_QUOTE_SETS);
+        index = encodeIntValue(out, index, temp, message.getQuoteSetCount());
+
+        // quote sets
+        for (int i = 0; i < message.getQuoteSetCount(); i++) {
+            MassQuote.QuoteSet quoteSet = message.getQuoteSet(i);
+
+            // quote set id
+            if (quoteSet.isQuoteSetIdDefined()) {
+                index = encodeTag(out, index, FixFields.QUOTE_SET_ID);
+                index = encodeStringNativeValue(out, index, quoteSet.getQuoteSetId());
+            }
+
+            // number of quot entries
+            index = encodeTag(out, index, FixFields.NO_QUOTE_ENTRIES);
+            index = encodeIntValue(out, index, temp, quoteSet.getEntryCount());
+
+            // quote entries
+            for (int j = 0; j < quoteSet.getEntryCount(); j++) {
+                MassQuote.QuoteEntry entry = quoteSet.getEntry(j);
+
+                // quote entry id
+                if (entry.isQuoteEntryIdDefined()) {
+                    index = encodeTag(out, index, FixFields.QUOTE_ENTRY_ID);
+                    index = encodeStringNativeValue(out, index, entry.getQuoteEntryId());
+                }
+
+                // issuer
+                if (entry.isIssuerDefined()) {
+                    index = encodeTag(out, index, FixFields.ISSUER);
+                    index = encodeStringNativeValue(out, index, entry.getIssuer());
+                }
+
+                // bid size
+                index = encodeTag(out, index, FixFields.BID_SIZE);
+                index = encodeDoubleValue(out, index, temp, entry.getBidSize());
+
+                // bid price
+                index = encodeTag(out, index, FixFields.BID_SPOT_RATE);
+                index = encodeDoubleValue(out, index, temp, entry.getBidSpotRate());
+
+                // offer size
+                index = encodeTag(out, index, FixFields.OFFER_SIZE);
+                index = encodeDoubleValue(out, index, temp, entry.getOfferSize());
+
+                // offer price
+                index = encodeTag(out, index, FixFields.OFFER_SPOT_RATE);
+                index = encodeDoubleValue(out, index, temp, entry.getOfferSpotRate());
+            }
+        }
+
+        return index;
     }
 
 

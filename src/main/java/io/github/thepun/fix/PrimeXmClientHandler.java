@@ -10,7 +10,7 @@ import io.netty.util.concurrent.ScheduledFuture;
 
 import java.util.concurrent.TimeUnit;
 
-import static io.github.thepun.fix.CommonCodecUtil.*;
+import static io.github.thepun.fix.PrimitiveCodecUtil.*;
 import static io.github.thepun.fix.PrimeXmCodecUtil.*;
 
 final class PrimeXmClientHandler extends ChannelDuplexHandler {
@@ -129,12 +129,12 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
         ByteBuf msgByteBuf = (ByteBuf) msg;
 
-        int index, start, count, length, msgType;
-
         // check if we should read from buffer first
         ByteBuf in;
         ByteBuf localBuffer = buffer;
         if (localBuffer != null) {
+            buffer = null;
+
             // allocate new buffer and copy everything if we don't have enough capacity to store new message
             int msgReadableBytes = msgByteBuf.readableBytes();
             if (!localBuffer.isWritable(msgReadableBytes)) {
@@ -144,7 +144,6 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
                 newBuffer.writeBytes(localBuffer);
                 localBuffer.release();
                 localBuffer = newBuffer;
-                buffer = newBuffer;
             }
 
             localBuffer.writeBytes(msgByteBuf);
@@ -156,8 +155,10 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
         }
 
         // read until the end
+        int index, start, length, msgType;
         int readableBytes = in.readableBytes();
         while (readableBytes > 0) {
+
             // remember message start
             index = in.readerIndex();
             start = index;
@@ -203,14 +204,14 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
                 switch (msgType) {
                     case FixMsgTypes.HEARTBEAT:
                         Heartbeat heartbeat = Heartbeat.reuseOrCreate();
-                        index = decodeHeartbeat(in, index, value, heartbeat);
+                        index = GenericCodecUtil.decodeHeartbeat(in, index, value, heartbeat);
                         // just decode it and not do anything else
                         heartbeat.release();
                         break;
 
                     case FixMsgTypes.TEST:
                         Test test = Test.newInstance();
-                        index = decodeTest(in, index, value, test);
+                        index = GenericCodecUtil.decodeTest(in, index, value, test);
                         // send heartbeat on test message
                         Heartbeat heartbeatForTest = Heartbeat.reuseOrCreate();
                         heartbeatForTest.initBuffer(msgByteBuf);
@@ -222,13 +223,13 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
                     case FixMsgTypes.MARKET_DATA_REJECT:
                         MarketDataRequestReject reject = new MarketDataRequestReject();
-                        index = decodeMarketDataRequestReject(in, index, temp, value, reject);
-                        fixLogger.status("Market data request with id " + reject.getMdReqID() + " in session " + sessionName + " was rejected: " + reject.getText());
+                        index = GenericCodecUtil.decodeMarketDataRequestReject(in, index, temp, value, reject);
+                        fixLogger.status("Market data request with id " + reject.getMdReqId() + " in session " + sessionName + " was rejected: " + reject.getText());
                         break;
 
                     case FixMsgTypes.LOGON:
                         Logon logon = new Logon();
-                        index = decodeLogon(in, index, temp, value, logon);
+                        index = GenericCodecUtil.decodeLogon(in, index, temp, value, logon);
                         fixLogger.status("Received logon in session " + sessionName);
                         scheduleHeartbeats(ctx);
                         SubscriptionSender subscriptionSender = new SubscriptionSender(ctx.channel());
@@ -238,7 +239,7 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
                     case FixMsgTypes.LOGOUT:
                         Logout logout = new Logout();
-                        index = decodeLogout(in, index, temp, value, logout);
+                        index = GenericCodecUtil.decodeLogout(in, index, temp, value, logout);
                         fixLogger.status("Received logout in session " + sessionName);
                         cancelHeartbeats();
                         ctx.close();
@@ -257,7 +258,6 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
         // we finished reading from message or buffer fully
         in.release();
-        buffer = null;
     }
 
     // TODO: ensure on error buffers will not leak
@@ -300,18 +300,18 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
             bodyBuf.setByte(msgTypeIndex, FixMsgTypes.HEARTBEAT);
 
             Heartbeat heartbeat = (Heartbeat) msg;
-            bodyIndex = encodeHeartbeat(bodyBuf, bodyIndex, heartbeat);
+            bodyIndex = GenericCodecUtil.encodeHeartbeat(bodyBuf, bodyIndex, heartbeat);
             heartbeat.release();
         } else if (msg instanceof MarketDataRequest) {
             bodyBuf.setByte(msgTypeIndex, FixMsgTypes.MARKET_DATA_REQUEST);
 
             MarketDataRequest marketDataRequest = (MarketDataRequest) msg;
-            bodyIndex = encodeMarketDataRequest(bodyBuf, bodyIndex, temp, value, marketDataRequest);
+            bodyIndex = GenericCodecUtil.encodeMarketDataRequest(bodyBuf, bodyIndex, temp, marketDataRequest);
         } else if (msg instanceof Logon) {
             bodyBuf.setByte(msgTypeIndex, FixMsgTypes.LOGON);
 
             Logon logon = (Logon) msg;
-            bodyIndex = encodeLogon(bodyBuf, bodyIndex, temp, logon);
+            bodyIndex = GenericCodecUtil.encodeLogon(bodyBuf, bodyIndex, temp, logon);
         } else {
             fixLogger.status("Unknown message: " + msg.getClass().getName());
             ReferenceCountUtil.release(msg);
@@ -358,7 +358,7 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        super.exceptionCaught(ctx, cause);
+        fixLogger.status("Error during ");
 
         // TODO: process exception in channel
     }

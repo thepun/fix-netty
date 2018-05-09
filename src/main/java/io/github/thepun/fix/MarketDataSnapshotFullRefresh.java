@@ -21,10 +21,12 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
     }
 
 
-    private final OffHeapCharSequence mdReqID;
+    private final OffHeapCharSequence mdReqId;
     private final OffHeapCharSequence symbol;
     private final Recycler.Handle<MarketDataSnapshotFullRefresh> recyclerHandle;
 
+    private boolean mdReqIdDefined;
+    private boolean symbolDefined;
     private ByteBuf buffer;
     private int entryCount;
     private MDEntry[] entries;
@@ -32,12 +34,12 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
     private MarketDataSnapshotFullRefresh(Recycler.Handle<MarketDataSnapshotFullRefresh> recyclerHandle) {
         this.recyclerHandle = recyclerHandle;
 
-        mdReqID = new OffHeapCharSequence();
+        mdReqId = new OffHeapCharSequence();
         symbol = new OffHeapCharSequence();
     }
 
-    public OffHeapCharSequence getMdReqID() {
-        return mdReqID;
+    public OffHeapCharSequence getMdReqId() {
+        return mdReqId;
     }
 
     public OffHeapCharSequence getSymbol() {
@@ -46,6 +48,22 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
 
     public ByteBuf getBuffer() {
         return buffer;
+    }
+
+    public boolean isMdReqIdDefined() {
+        return mdReqIdDefined;
+    }
+
+    public void setMdReqIdDefined(boolean mdReqIdDefined) {
+        this.mdReqIdDefined = mdReqIdDefined;
+    }
+
+    public boolean isSymbolDefined() {
+        return symbolDefined;
+    }
+
+    public void setSymbolDefined(boolean symbolDefined) {
+        this.symbolDefined = symbolDefined;
     }
 
     public MDEntry getEntry(int index) {
@@ -100,6 +118,9 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
         private final OffHeapCharSequence symbol;
         private final OffHeapCharSequence currency;
 
+        private boolean idDefined;
+        private boolean symbolDefined;
+        private boolean currencyDefined;
         private int mdUpdateAction;
         private int mdEntryType;
         private double mdEntryPX;
@@ -122,6 +143,30 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
 
         public OffHeapCharSequence getCurrency() {
             return currency;
+        }
+
+        public boolean isIdDefined() {
+            return idDefined;
+        }
+
+        public void setIdDefined(boolean idDefined) {
+            this.idDefined = idDefined;
+        }
+
+        public boolean isSymbolDefined() {
+            return symbolDefined;
+        }
+
+        public void setSymbolDefined(boolean symbolDefined) {
+            this.symbolDefined = symbolDefined;
+        }
+
+        public boolean isCurrencyDefined() {
+            return currencyDefined;
+        }
+
+        public void setCurrencyDefined(boolean currencyDefined) {
+            this.currencyDefined = currencyDefined;
         }
 
         public int getMdUpdateAction() {

@@ -2,15 +2,15 @@ package io.github.thepun.fix;
 
 final class MarketDataRequestReject {
 
-    private String mdReqID;
+    private String mdReqId;
     private String text;
 
-    public String getMdReqID() {
-        return mdReqID;
+    public String getMdReqId() {
+        return mdReqId;
     }
 
-    public void setMdReqID(String mdReqID) {
-        this.mdReqID = mdReqID;
+    public void setMdReqId(String mdReqId) {
+        this.mdReqId = mdReqId;
     }
 
     public String getText() {

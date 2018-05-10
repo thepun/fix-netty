@@ -16,7 +16,7 @@ public class App {
     private static CountDownLatch quoteLatch;
 
     public static void main(String[] args) throws InterruptedException {
-        int quoteCount = 1000;
+        int quoteCount = 1000000;
 
         //System.setProperty("io.netty.allocator.type", "unpooled");
         //System.setProperty("io.netty.leakDetection.targetRecords", "100");
@@ -115,14 +115,16 @@ public class App {
         entry.setOfferSpotRate(11235);
 
         // first
-        quoteLatch = new CountDownLatch(quoteCount);
-        for (int i = 0; i < quoteCount; i++) {
-            quote.retain();
-            server.send(quote);
+        for (int k = 0; k < 10; k++) {
+            quoteLatch = new CountDownLatch(quoteCount);
+            for (int i = 0; i < quoteCount; i++) {
+                quote.retain();
+                server.send(quote);
+            }
+            quoteLatch.await();
         }
-        quoteLatch.await();
 
-        Thread.sleep(1000);
+        Thread.sleep(3000);
 
         // second
         quoteLatch = new CountDownLatch(quoteCount);

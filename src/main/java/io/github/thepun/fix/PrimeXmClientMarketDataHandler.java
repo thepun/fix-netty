@@ -19,6 +19,7 @@ final class PrimeXmClientMarketDataHandler extends ChannelDuplexHandler {
     private static final String START_HEADER_2 = "9=";
     private static final int START_HEADER_LENGTH = START_HEADER_1.length() + START_HEADER_2.length() + 1;
     private static final int BEGIN_STRING_LENGTH = 10;
+    private static final int MIN_MSG_SIZE = 20;
     private static final int CHECKSUM_LENGTH = 7;
 
 
@@ -157,7 +158,13 @@ final class PrimeXmClientMarketDataHandler extends ChannelDuplexHandler {
         // read until the end
         int index, start, length, msgType;
         int readableBytes = in.readableBytes();
-        while (readableBytes > 0) {
+        do {
+            // not enough bytes to read length
+            if (readableBytes < MIN_MSG_SIZE) {
+                buffer = in;
+                return;
+            }
+
             // remember message start
             index = in.readerIndex();
             start = index;
@@ -254,7 +261,7 @@ final class PrimeXmClientMarketDataHandler extends ChannelDuplexHandler {
             // change buffer position
             in.readerIndex(index);
             readableBytes = in.readableBytes();
-        }
+        } while (readableBytes > 0);
 
         // we finished reading from message or buffer fully
         in.release();

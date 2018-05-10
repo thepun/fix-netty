@@ -54,8 +54,12 @@ class GenericCodecUtil {
                                 break symbols;
                         }
                     }
+                    index = decodeTag(in, index, value);
 
                     break;
+
+                case FixFields.CHECK_SUM:
+                    return skipValue(in, index);
 
                 default:
                     index = skipValue(in, index);

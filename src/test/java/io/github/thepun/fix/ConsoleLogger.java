@@ -18,14 +18,14 @@ final class ConsoleLogger implements FixLogger {
 
     @Override
     public void incoming(ByteBuf buffer, int offset, int length) {
-        CharSequence text = buffer.getCharSequence(offset, length, CharsetUtil.US_ASCII);
-        System.out.println("Incoming[" + name + "]: " + text);
+        //CharSequence text = buffer.getCharSequence(offset, length, CharsetUtil.US_ASCII);
+        //System.out.println("Incoming[" + name + "]: " + text);
     }
 
     @Override
     public void outgoing(ByteBuf first, int firstOffset, int firstLength, ByteBuf second, int secondOffset, int secondLength) {
-        CharSequence text1 = first.getCharSequence(firstOffset, firstLength, CharsetUtil.US_ASCII);
-        CharSequence text2 = second.getCharSequence(secondOffset, secondLength, CharsetUtil.US_ASCII);
-        System.out.println("Outgoing[" + name + "]: " + text1 + text2);
+        //CharSequence text1 = first.getCharSequence(firstOffset, firstLength, CharsetUtil.US_ASCII);
+        //CharSequence text2 = second.getCharSequence(secondOffset, secondLength, CharsetUtil.US_ASCII);
+        //System.out.println("Outgoing[" + name + "]: " + text1 + text2);
     }
 }

@@ -1,11 +1,27 @@
 package io.github.thepun.fix;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.util.CharsetUtil;
+import io.netty.util.ResourceLeakDetector;
+
+import java.util.concurrent.CountDownLatch;
+
 public class App {
 
+    private static long start;
+    private static long finish;
     private static PrimeXmClientMarketDataSession client;
     private static PrimeXmServerMarketDataSession server;
 
     public static void main(String[] args) throws InterruptedException {
+        int quoteCount = 1000000;
+
+        ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
+
+        CountDownLatch subscriptionLatch = new CountDownLatch(1);
+        CountDownLatch quoteLatch = new CountDownLatch(quoteCount);
+
         client = new MarketDataSessionBuilder()
                 .logger(new ConsoleLogger("client"))
                 .host("localhost")
@@ -33,10 +49,11 @@ public class App {
                     client.send(request);
                 })
                 .quotesListener(quotes -> {
-                    MassQuote.QuoteSet quoteSet = quotes.getQuoteSet(0);
+                    quoteLatch.countDown();
+                    /*MassQuote.QuoteSet quoteSet = quotes.getQuoteSet(0);
                     MassQuote.QuoteEntry entry = quoteSet.getEntry(0);
                     System.out.println("Quote(" + quoteSet.getQuoteSetId().toString() + "): bid=" + entry.getBidSpotRate() + " ask=" + entry.getOfferSpotRate());
-                    quotes.release();
+                    quotes.release();*/
                 })
                 .primeXmClient();
 
@@ -55,14 +72,56 @@ public class App {
                     System.out.println("Disconnect server");
                 })
                 .subscribeListener(subscribe -> {
-                    Object o = null;
+                    System.out.println("Subscription");
+                    start = System.currentTimeMillis();
+                    subscriptionLatch.countDown();
                 })
                 .primeXmServer();
 
         server.start();
         client.start();
+        subscriptionLatch.await();
 
-        Thread.sleep(10000000L);
+
+        ByteBuf buffer = PooledByteBufAllocator.DEFAULT.directBuffer();
+        long index = buffer.memoryAddress() + buffer.readerIndex();
+
+        MassQuote quote = MassQuote.reuseOrCreate();
+        quote.initBuffer(buffer);
+        quote.initQuoteSets(1);
+        String quoteId = "quote";
+        buffer.writeCharSequence(quoteId, CharsetUtil.US_ASCII);
+        quote.getQuoteId().setAddress(index, quoteId.length());
+        quote.setQuoteIdDefined(true);
+        index += quoteId.length();
+
+        MassQuote.QuoteSet quoteSet = quote.getQuoteSet(0);
+        quoteSet.initEntries(1);
+        String quoteSetId = "quoteSet";
+        buffer.writeCharSequence(quoteSetId, CharsetUtil.US_ASCII);
+        quoteSet.getQuoteSetId().setAddress(index, quoteSetId.length());
+        quoteSet.setQuoteSetIdDefined(true);
+        index += quoteSetId.length();
+
+        MassQuote.QuoteEntry entry = quoteSet.getEntry(0);
+        String quoteEntrytId = "quoteEntry";
+        buffer.writeCharSequence(quoteEntrytId, CharsetUtil.US_ASCII);
+        entry.getQuoteEntryId().setAddress(index, quoteEntrytId.length());
+        entry.setQuoteEntryIdDefined(true);
+        entry.setBidSize(1000);
+        entry.setOfferSize(2000);
+        entry.setBidSpotRate(11234);
+        entry.setOfferSpotRate(11235);
+
+        for (int i = 0; i < quoteCount; i++) {
+            quote.retain();
+            server.send(quote);
+        }
+
+        quoteLatch.await();
+
+        finish = System.currentTimeMillis();
+        System.out.println("Finished: " + (finish - start) + "ms");
     }
 
 

@@ -10,10 +10,10 @@ import io.netty.util.concurrent.ScheduledFuture;
 
 import java.util.concurrent.TimeUnit;
 
+import static io.github.thepun.fix.PrimeXmCodecUtil.skipHeader;
 import static io.github.thepun.fix.PrimitiveCodecUtil.*;
-import static io.github.thepun.fix.PrimeXmCodecUtil.*;
 
-final class PrimeXmClientHandler extends ChannelDuplexHandler {
+final class PrimeXmServerMarketDataHandler extends ChannelDuplexHandler {
 
     private static final String START_HEADER_1 = "8=FIX.4.4";
     private static final String START_HEADER_2 = "9=";
@@ -22,12 +22,9 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
     private static final int CHECKSUM_LENGTH = 7;
 
 
-    private final int heartbeatInterval;
-
     private final FixLogger fixLogger;
     private final FixSessionInfo sessionInfo;
-    private final MarketDataReadyListener readyListener;
-    private final MarketDataQuotesListener quotesListener;
+    private final MarketDataRequestListener requestListener;
 
     private Value value;
     private byte[] temp;
@@ -39,15 +36,14 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
     private String sessionName;
 
     private int sequenceNumber;
+    private int heartbeatInterval;
     private int sessionHeaderLength;
     private ScheduledFuture<?> heartbeatSchedule;
 
-    PrimeXmClientHandler(FixSessionInfo sessionInfo, FixLogger fixLogger, MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener, int heartbeatInterval) {
+    PrimeXmServerMarketDataHandler(FixSessionInfo sessionInfo, FixLogger fixLogger, MarketDataRequestListener requestListener) {
         this.fixLogger = fixLogger;
         this.sessionInfo = sessionInfo;
-        this.readyListener = readyListener;
-        this.quotesListener = quotesListener;
-        this.heartbeatInterval = heartbeatInterval;
+        this.requestListener = requestListener;
     }
 
     @Override
@@ -101,17 +97,6 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
         sessionName = ctx.channel().toString();
 
         super.channelActive(ctx);
-
-        fixLogger.status("Sending logon in session " + sessionName);
-
-        Logon logon = new Logon();
-        logon.setEncryptMethod(0);
-        logon.setHeartbeatInterval(10);
-        logon.setResetSqNumFlag(true);
-        logon.setUsername(sessionInfo.getUsername());
-        logon.setPassword(sessionInfo.getPassword());
-        write(ctx, logon, ctx.voidPromise());
-        ctx.flush();
     }
 
     @Override
@@ -190,65 +175,54 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
             index = skipHeader(in, index);
 
             // read message content
-            if (msgType == FixMsgTypes.MASS_QUOTE) {
-                // fast path
-                MassQuote quotes = MassQuote.reuseOrCreate();
-                index = decodeMassQuote(in, index, value, quotes);
-                quotesListener.onMarketData(quotes);
-                if (quotes.isQuoteIdDefined()) {
-                    // TODO: implement Mass Quote Acknowledge
-                }
-                quotes.release();
-            } else {
-                // slow path
-                switch (msgType) {
-                    case FixMsgTypes.HEARTBEAT:
-                        Heartbeat heartbeat = Heartbeat.reuseOrCreate();
-                        index = GenericCodecUtil.decodeHeartbeat(in, index, value, heartbeat);
-                        // just decode it and not do anything else
-                        heartbeat.release();
-                        break;
+            switch (msgType) {
+                case FixMsgTypes.HEARTBEAT:
+                    Heartbeat heartbeat = Heartbeat.reuseOrCreate();
+                    index = GenericCodecUtil.decodeHeartbeat(in, index, value, heartbeat);
+                    // just decode it and not do anything else
+                    heartbeat.release();
+                    break;
 
-                    case FixMsgTypes.TEST:
-                        Test test = Test.newInstance();
-                        index = GenericCodecUtil.decodeTest(in, index, value, test);
-                        // send heartbeat on test message
-                        Heartbeat heartbeatForTest = Heartbeat.reuseOrCreate();
-                        heartbeatForTest.initBuffer(msgByteBuf);
-                        heartbeatForTest.getTestId().setAddress(test.getTestId());
-                        heartbeatForTest.setTestIdDefined(true);
-                        write(ctx, heartbeatForTest, ctx.voidPromise());
-                        ctx.flush();
-                        break;
+                case FixMsgTypes.TEST:
+                    Test test = Test.newInstance();
+                    index = GenericCodecUtil.decodeTest(in, index, value, test);
+                    // send heartbeat on test message
+                    Heartbeat heartbeatForTest = Heartbeat.reuseOrCreate();
+                    heartbeatForTest.initBuffer(msgByteBuf);
+                    heartbeatForTest.getTestId().setAddress(test.getTestId());
+                    heartbeatForTest.setTestIdDefined(true);
+                    write(ctx, heartbeatForTest, ctx.voidPromise());
+                    ctx.flush();
+                    break;
 
-                    case FixMsgTypes.MARKET_DATA_REJECT:
-                        MarketDataRequestReject reject = new MarketDataRequestReject();
-                        index = GenericCodecUtil.decodeMarketDataRequestReject(in, index, temp, value, reject);
-                        fixLogger.status("Market data request with id " + reject.getMdReqId() + " in session " + sessionName + " was rejected: " + reject.getText());
-                        break;
+                case FixMsgTypes.MARKET_DATA_REQUEST:
+                    MarketDataRequest request = new MarketDataRequest();
+                    index = GenericCodecUtil.decodeMarketDataRequest(in, index, temp, value, request);
+                    requestListener.onMarketDataRequest(request);
+                    break;
 
-                    case FixMsgTypes.LOGON:
-                        Logon logon = new Logon();
-                        index = GenericCodecUtil.decodeLogon(in, index, temp, value, logon);
-                        fixLogger.status("Received logon in session " + sessionName);
-                        scheduleHeartbeats(ctx);
-                        SubscriptionSender subscriptionSender = new SubscriptionSender(ctx.channel());
-                        readyListener.onReady(subscriptionSender);
-                        subscriptionSender.disable();
-                        break;
+                case FixMsgTypes.LOGON:
+                    Logon logon = new Logon();
+                    index = GenericCodecUtil.decodeLogon(in, index, temp, value, logon);
+                    fixLogger.status("Received logon in session " + sessionName);
+                    heartbeatInterval = logon.getHeartbeatInterval();
+                    scheduleHeartbeats(ctx);
+                    // just send same logon back
+                    write(ctx, logon, ctx.voidPromise());
+                    ctx.flush();
+                    break;
 
-                    case FixMsgTypes.LOGOUT:
-                        Logout logout = new Logout();
-                        index = GenericCodecUtil.decodeLogout(in, index, temp, value, logout);
-                        fixLogger.status("Received logout in session " + sessionName);
-                        cancelHeartbeats();
-                        ctx.close();
-                        break;
+                case FixMsgTypes.LOGOUT:
+                    Logout logout = new Logout();
+                    index = GenericCodecUtil.decodeLogout(in, index, temp, value, logout);
+                    fixLogger.status("Received logout in session " + sessionName);
+                    cancelHeartbeats();
+                    ctx.close();
+                    break;
 
-                    default:
-                        index = skipUntilChecksum(in, index, value);
-                        fixLogger.status("Unknown message type in session " + sessionName + ": " + ((char) msgType));
-                }
+                default:
+                    index = skipUntilChecksum(in, index, value);
+                    fixLogger.status("Unknown message type in session " + sessionName + ": " + ((char) msgType));
             }
 
             // change buffer position
@@ -263,7 +237,6 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
     // TODO: ensure on error buffers will not leak
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
-        Value value = this.value;
         byte[] temp = this.temp;
 
         // prepare buffers
@@ -296,14 +269,20 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
         bodyIndex = encodeDateTime(bodyBuf, bodyIndex, currentTime, sb);
 
         // write body
-        if (msg instanceof Heartbeat) {
+        if (msg instanceof MassQuote) {
+            bodyBuf.setByte(msgTypeIndex, FixMsgTypes.MASS_QUOTE);
+
+            MassQuote massQuote = (MassQuote) msg;
+            bodyIndex = PrimeXmCodecUtil.encodeMassQuote(bodyBuf, bodyIndex, temp, massQuote);
+            massQuote.release();
+        } else if (msg instanceof Heartbeat) {
             bodyBuf.setByte(msgTypeIndex, FixMsgTypes.HEARTBEAT);
 
             Heartbeat heartbeat = (Heartbeat) msg;
             bodyIndex = GenericCodecUtil.encodeHeartbeat(bodyBuf, bodyIndex, heartbeat);
             heartbeat.release();
         } else if (msg instanceof MarketDataRequest) {
-            bodyBuf.setByte(msgTypeIndex, FixMsgTypes.MARKET_DATA_REQUEST);
+            bodyBuf.setByte(msgTypeIndex, FixMsgTypes.MARKET_DATA_REJECT);
 
             MarketDataRequest marketDataRequest = (MarketDataRequest) msg;
             bodyIndex = GenericCodecUtil.encodeMarketDataRequest(bodyBuf, bodyIndex, temp, marketDataRequest);
@@ -312,6 +291,11 @@ final class PrimeXmClientHandler extends ChannelDuplexHandler {
 
             Logon logon = (Logon) msg;
             bodyIndex = GenericCodecUtil.encodeLogon(bodyBuf, bodyIndex, temp, logon);
+        } else if (msg instanceof Logout) {
+            bodyBuf.setByte(msgTypeIndex, FixMsgTypes.LOGON);
+
+            Logout logut = (Logout) msg;
+            bodyIndex = GenericCodecUtil.encodeLogout(bodyBuf, bodyIndex, logut);
         } else {
             fixLogger.status("Unknown message: " + msg.getClass().getName());
             ReferenceCountUtil.release(msg);

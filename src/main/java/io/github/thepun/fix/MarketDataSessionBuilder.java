@@ -26,6 +26,7 @@ public final class MarketDataSessionBuilder {
     private MarketDataReadyListener readyListener;
     private MarketDataQuotesListener quotesListener;
     private MarketDataSnapshotListener snapshotListener;
+    private MarketDataRequestListener subscribeListener;
     private NioEventLoopGroup executor;
 
     public MarketDataSessionBuilder() {
@@ -107,6 +108,11 @@ public final class MarketDataSessionBuilder {
 
     public MarketDataSessionBuilder readyListener(MarketDataReadyListener readyListener) {
         this.readyListener = readyListener;
+        return this;
+    }
+
+    public MarketDataSessionBuilder subscribeListener(MarketDataRequestListener subscribeListener) {
+        this.subscribeListener = subscribeListener;
         return this;
     }
 

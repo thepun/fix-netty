@@ -10,11 +10,12 @@ import io.netty.util.concurrent.Future;
 
 import java.util.concurrent.TimeUnit;
 
+// TODO: check for deadlocks
 public final class PrimeXmClientMarketDataSession {
 
     private final FixConnectListener connectListener;
     private final FixDisconnectListener disconnectListener;
-    private final PrimeXMClientInitializer initializer;
+    private final PrimeXmClientInitializer initializer;
     private final NioEventLoopGroup executor;
     private final FixLogger fixLogger;
     private final String host;
@@ -22,6 +23,7 @@ public final class PrimeXmClientMarketDataSession {
     private final int reconnectInterval;
 
     private boolean active;
+    private boolean connected;
     private Channel lastChannel;
 
     PrimeXmClientMarketDataSession(NioEventLoopGroup executor, FixSessionInfo fixSessionInfo, FixLogger fixLogger, MarketDataQuotesListener quotesListener,
@@ -35,49 +37,47 @@ public final class PrimeXmClientMarketDataSession {
         this.host = host;
         this.port = port;
 
-        initializer = new PrimeXMClientInitializer(fixSessionInfo, fixLogger, readyListener, quotesListener, heartbeatInterval);
+        initializer = new PrimeXmClientInitializer(fixSessionInfo, fixLogger, readyListener, quotesListener, heartbeatInterval);
     }
 
-    public synchronized PrimeXmClientMarketDataSession start() {
+    public synchronized void start() {
         if (active) {
             throw new IllegalStateException("Already started");
         }
 
-        active = true;
-
         fixLogger.status("Start session with " + host + ":" + port);
 
-        reconnect();
+        active = true;
+        connected = false;
 
-        return this;
+        reconnect();
     }
 
-    public synchronized PrimeXmClientMarketDataSession stop() {
+    public synchronized void stop() {
         if (!active) {
             throw new IllegalStateException("Not started");
         }
 
-        active = false;
-
         fixLogger.status("Stop session with " + host + ":" + port);
 
+        active = false;
+
         if (lastChannel != null) {
-            lastChannel.close();
+            lastChannel.close().awaitUninterruptibly();
             lastChannel = null;
         }
 
-        return this;
+        connected = false;
     }
 
-    // TODO: implement normal wait for stop
-    public PrimeXmClientMarketDataSession waitUntilStop() {
-        try {
-            Thread.sleep(100000000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+    public void send(MarketDataRequest request) {
+        Channel channel = lastChannel;
+        if (channel == null) {
+            fixLogger.status("MarketDataRequest message is dropped: session is not connected");
+            return;
         }
 
-        return this;
+        channel.writeAndFlush(request, channel.voidPromise());
     }
 
     private synchronized void reconnect() {
@@ -111,8 +111,12 @@ public final class PrimeXmClientMarketDataSession {
 
             executor.schedule(this::reconnect, reconnectInterval, TimeUnit.SECONDS);
 
-            if (disconnectListener != null) {
-                disconnectListener.onDisconnect();
+            if (connected) {
+                connected = false;
+
+                if (disconnectListener != null) {
+                    disconnectListener.onDisconnect();
+                }
             }
         }
     }
@@ -121,6 +125,8 @@ public final class PrimeXmClientMarketDataSession {
         if (active) {
             if (f.isSuccess()) {
                 fixLogger.status("Connection to " + host + ":" + port + " opened");
+
+                connected = true;
 
                 if (connectListener != null) {
                     connectListener.onConnnect();
@@ -134,7 +140,7 @@ public final class PrimeXmClientMarketDataSession {
     }
 
 
-    private static final class PrimeXMClientInitializer extends ChannelInitializer<NioSocketChannel> {
+    private final class PrimeXmClientInitializer extends ChannelInitializer<NioSocketChannel> {
 
         private final FixLogger fixLogger;
         private final FixSessionInfo fixSessionInfo;
@@ -142,7 +148,7 @@ public final class PrimeXmClientMarketDataSession {
         private final MarketDataQuotesListener quotesListener;
         private final int heartbeatInterval;
 
-        PrimeXMClientInitializer(FixSessionInfo fixSessionInfo, FixLogger fixLogger,
+        PrimeXmClientInitializer(FixSessionInfo fixSessionInfo, FixLogger fixLogger,
                                  MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener, int heartbeatInterval) {
             this.fixLogger = fixLogger;
             this.fixSessionInfo = fixSessionInfo;
@@ -153,7 +159,7 @@ public final class PrimeXmClientMarketDataSession {
 
         @Override
         protected void initChannel(NioSocketChannel ch) {
-            ch.pipeline().addLast(new PrimeXmClientHandler(fixSessionInfo, fixLogger, readyListener, quotesListener, heartbeatInterval));
+            ch.pipeline().addLast(new PrimeXmClientMarketDataHandler(fixSessionInfo, fixLogger, readyListener, quotesListener, heartbeatInterval));
         }
     }
 }

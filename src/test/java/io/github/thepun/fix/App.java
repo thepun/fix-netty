@@ -13,14 +13,17 @@ public class App {
     private static long finish;
     private static PrimeXmClientMarketDataSession client;
     private static PrimeXmServerMarketDataSession server;
+    private static CountDownLatch quoteLatch;
 
     public static void main(String[] args) throws InterruptedException {
-        int quoteCount = 1000000;
+        int quoteCount = 1000;
 
-        ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
+        //System.setProperty("io.netty.allocator.type", "unpooled");
+        //System.setProperty("io.netty.leakDetection.targetRecords", "100");
+
+        ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.DISABLED);
 
         CountDownLatch subscriptionLatch = new CountDownLatch(1);
-        CountDownLatch quoteLatch = new CountDownLatch(quoteCount);
 
         client = new MarketDataSessionBuilder()
                 .logger(new ConsoleLogger("client"))
@@ -73,7 +76,6 @@ public class App {
                 })
                 .subscribeListener(subscribe -> {
                     System.out.println("Subscription");
-                    start = System.currentTimeMillis();
                     subscriptionLatch.countDown();
                 })
                 .primeXmServer();
@@ -81,7 +83,6 @@ public class App {
         server.start();
         client.start();
         subscriptionLatch.await();
-
 
         ByteBuf buffer = PooledByteBufAllocator.DEFAULT.directBuffer();
         long index = buffer.memoryAddress() + buffer.readerIndex();
@@ -113,15 +114,30 @@ public class App {
         entry.setBidSpotRate(11234);
         entry.setOfferSpotRate(11235);
 
+        // first
+        quoteLatch = new CountDownLatch(quoteCount);
         for (int i = 0; i < quoteCount; i++) {
             quote.retain();
             server.send(quote);
         }
-
         quoteLatch.await();
 
+        Thread.sleep(1000);
+
+        // second
+        quoteLatch = new CountDownLatch(quoteCount);
+        start = System.currentTimeMillis();
+        for (int i = 0; i < quoteCount; i++) {
+            quote.retain();
+            server.send(quote);
+        }
+        quoteLatch.await();
         finish = System.currentTimeMillis();
+
         System.out.println("Finished: " + (finish - start) + "ms");
+
+        System.gc();
+
     }
 
 

@@ -209,6 +209,8 @@ class GenericCodecUtil {
     }
 
     static int decodeHeartbeat(ByteBuf in, int index, Value value, Heartbeat message) {
+        message.initBuffer(in);
+
         index = decodeTag(in, index, value);
         int tag = value.getIntValue();
         if (tag == FixFields.TEST_REQ_ID) {
@@ -222,6 +224,8 @@ class GenericCodecUtil {
     }
 
     static int decodeTest(ByteBuf in, int index, Value value, Test message) {
+        message.initBuffer(in);
+
         index = decodeTag(in, index, value);
         decodeStringNativeValue(in, index, message.getTestId());
 

@@ -17,7 +17,7 @@ final class Heartbeat extends AbstractReferenceCounted {
 
     static Heartbeat reuseOrCreate() {
         Heartbeat heartbeat = RECYCLER.get();
-        heartbeat.retain();
+        //heartbeat.retain();
         return heartbeat;
     }
 
@@ -67,6 +67,7 @@ final class Heartbeat extends AbstractReferenceCounted {
             buffer = null;
         }
 
+        setRefCnt(1);
         recyclerHandle.recycle(this);
     }
 }

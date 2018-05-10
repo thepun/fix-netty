@@ -178,13 +178,15 @@ final class PrimeXmServerMarketDataHandler extends ChannelDuplexHandler {
             switch (msgType) {
                 case FixMsgTypes.HEARTBEAT:
                     Heartbeat heartbeat = Heartbeat.reuseOrCreate();
+                    heartbeat.initBuffer(in);
                     index = GenericCodecUtil.decodeHeartbeat(in, index, value, heartbeat);
                     // just decode it and not do anything else
                     heartbeat.release();
                     break;
 
                 case FixMsgTypes.TEST:
-                    Test test = Test.newInstance();
+                    Test test = Test.reuseOrCreate();
+                    test.initBuffer(in);
                     index = GenericCodecUtil.decodeTest(in, index, value, test);
                     // send heartbeat on test message
                     Heartbeat heartbeatForTest = Heartbeat.reuseOrCreate();
@@ -193,6 +195,7 @@ final class PrimeXmServerMarketDataHandler extends ChannelDuplexHandler {
                     heartbeatForTest.setTestIdDefined(true);
                     write(ctx, heartbeatForTest, ctx.voidPromise());
                     ctx.flush();
+                    test.release();
                     break;
 
                 case FixMsgTypes.MARKET_DATA_REQUEST:

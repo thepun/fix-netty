@@ -15,8 +15,10 @@ final class Test extends AbstractReferenceCounted {
         }
     };
 
-    static Test newInstance() {
-        return RECYCLER.get();
+    static Test reuseOrCreate() {
+        Test test = RECYCLER.get();
+        //test.retain();
+        return test;
     }
 
 
@@ -56,6 +58,7 @@ final class Test extends AbstractReferenceCounted {
             buffer = null;
         }
 
+        setRefCnt(1);
         recyclerHandle.recycle(this);
     }
 }

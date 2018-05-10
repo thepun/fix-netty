@@ -158,7 +158,6 @@ final class PrimeXmClientMarketDataHandler extends ChannelDuplexHandler {
         int index, start, length, msgType;
         int readableBytes = in.readableBytes();
         while (readableBytes > 0) {
-
             // remember message start
             index = in.readerIndex();
             start = index;
@@ -199,6 +198,7 @@ final class PrimeXmClientMarketDataHandler extends ChannelDuplexHandler {
                     // TODO: implement Mass Quote Acknowledge
                 }
                 quotes.release();
+                Object o = null;
             } else {
                 // slow path
                 switch (msgType) {
@@ -210,15 +210,17 @@ final class PrimeXmClientMarketDataHandler extends ChannelDuplexHandler {
                         break;
 
                     case FixMsgTypes.TEST:
-                        Test test = Test.newInstance();
+                        Test test = Test.reuseOrCreate();
+                        test.initBuffer(in);
                         index = GenericCodecUtil.decodeTest(in, index, value, test);
                         // send heartbeat on test message
                         Heartbeat heartbeatForTest = Heartbeat.reuseOrCreate();
-                        heartbeatForTest.initBuffer(msgByteBuf);
+                        heartbeatForTest.initBuffer(in);
                         heartbeatForTest.getTestId().setAddress(test.getTestId());
                         heartbeatForTest.setTestIdDefined(true);
                         write(ctx, heartbeatForTest, ctx.voidPromise());
                         ctx.flush();
+                        test.release();
                         break;
 
                     case FixMsgTypes.MARKET_DATA_REJECT:
@@ -256,6 +258,7 @@ final class PrimeXmClientMarketDataHandler extends ChannelDuplexHandler {
 
         // we finished reading from message or buffer fully
         in.release();
+        Object o = null;
     }
 
     // TODO: ensure on error buffers will not leak

@@ -5,9 +5,9 @@ public class App {
     private static PrimeXmClientMarketDataSession client;
     private static PrimeXmServerMarketDataSession server;
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         client = new MarketDataSessionBuilder()
-                .logger(new ConsoleLogger())
+                .logger(new ConsoleLogger("client"))
                 .host("localhost")
                 .port(12345)
                 .senderCompId("local")
@@ -41,7 +41,7 @@ public class App {
                 .primeXmClient();
 
         server = new MarketDataSessionBuilder()
-                .logger(new ConsoleLogger())
+                .logger(new ConsoleLogger("server"))
                 .host("localhost")
                 .port(12345)
                 .senderCompId("local")
@@ -61,6 +61,8 @@ public class App {
 
         server.start();
         client.start();
+
+        Thread.sleep(10000000L);
     }
 
 

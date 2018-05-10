@@ -157,6 +157,28 @@ public final class MarketDataSessionBuilder {
     }
 
     public PrimeXmServerMarketDataSession primeXmServer() {
-        return null;
+        if (subscribeListener == null) {
+            throw new IllegalStateException("Empty subscribe listener");
+        }
+
+        FixLogger localFixLogger = fixLogger;
+        if (localFixLogger == null) {
+            localFixLogger = NoOpFixLogger.INSTANCE;
+        }
+
+        NioEventLoopGroup localExecutor = executor;
+        if (localExecutor == null) {
+            localExecutor = new NioEventLoopGroup(1, r -> {
+                FastThreadLocalThread thread = new FastThreadLocalThread(r);
+                thread.setName("primexm-server-" + DEFAULT_THREAD_COUNTER.getAndIncrement());
+                thread.setDaemon(true);
+                return thread;
+            });
+        }
+
+        FixSessionInfo fixSessionInfo = new FixSessionInfo(senderCompId, senderSubId, targetCompId, targetSubId, username, password);
+
+        return new PrimeXmServerMarketDataSession(localExecutor, fixSessionInfo, localFixLogger, subscribeListener,
+                connectListener, disconnectListener, host, port);
     }
 }

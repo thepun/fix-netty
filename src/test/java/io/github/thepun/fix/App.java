@@ -3,8 +3,10 @@ package io.github.thepun.fix;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ResourceLeakDetector;
+import io.netty.util.concurrent.FastThreadLocalThread;
 
 import java.util.concurrent.CountDownLatch;
 
@@ -125,6 +127,7 @@ public class App {
 
                 server.send(quote);
             }
+            //server.flush();
             quoteLatch.await();
             finish = System.currentTimeMillis();
 

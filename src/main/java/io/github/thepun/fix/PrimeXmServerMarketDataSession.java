@@ -77,6 +77,16 @@ public final class PrimeXmServerMarketDataSession {
         }
     }
 
+    public void flush() {
+        Channel channel = lastClientChannel;
+        if (channel == null) {
+            return;
+        }
+
+        //channel.writeAndFlush(massQuote, channel.voidPromise());
+        channel.flush();
+    }
+
     public void send(MassQuote massQuote) {
         Channel channel = lastClientChannel;
         if (channel == null) {
@@ -85,6 +95,7 @@ public final class PrimeXmServerMarketDataSession {
         }
 
         channel.writeAndFlush(massQuote, channel.voidPromise());
+        //channel.write(massQuote, channel.voidPromise());
     }
 
     public void send(MarketDataRequestReject reject) {

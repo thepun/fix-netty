@@ -42,8 +42,13 @@ final class PrimitiveCodecUtil {
     }
 
     static int skipTag(ByteBuf in, int index) {
+        long address = in.memoryAddress();
+
+        long addressWithIndex;
         for (; ; index++) {
-            byte nextByte = in.getByte(index);
+            addressWithIndex = address + index;
+
+            byte nextByte = OffHeapMemory.getByte(addressWithIndex);
             if (nextByte == EQUAL_SIGN) {
                 index++;
                 break;
@@ -54,8 +59,13 @@ final class PrimitiveCodecUtil {
     }
 
     static int skipValue(ByteBuf in, int index) {
+        long address = in.memoryAddress();
+
+        long addressWithIndex;
         for (; ; index++) {
-            byte nextByte = in.getByte(index);
+            addressWithIndex = address + index;
+
+            byte nextByte =  OffHeapMemory.getByte(addressWithIndex);
             if (nextByte == DELIMITER) {
                 index++;
                 break;
@@ -82,9 +92,14 @@ final class PrimitiveCodecUtil {
     }
 
     static int decodeTag(ByteBuf in, int index, Value value) {
+        long address = in.memoryAddress();
+
         int tagNum = 0;
+        long addressWithIndex;
         for (; ; index++) {
-            byte nextByte = in.getByte(index);
+            addressWithIndex = address + index;
+
+            byte nextByte = OffHeapMemory.getByte(addressWithIndex);
             if (nextByte == EQUAL_SIGN) {
                 index++;
                 break;
@@ -98,9 +113,14 @@ final class PrimitiveCodecUtil {
     }
 
     static int decodeIntValue(ByteBuf in, int index, Value valueStore) {
+        long address = in.memoryAddress();
+
         int value = 0;
+        long addressWithIndex;
         for (; ; index++) {
-            byte nextByte = in.getByte(index);
+            addressWithIndex = address + index;
+
+            byte nextByte = OffHeapMemory.getByte(addressWithIndex);
             if (nextByte == DELIMITER) {
                 index++;
                 break;
@@ -122,10 +142,15 @@ final class PrimitiveCodecUtil {
     }
 
     static int decodeDoubleValue(ByteBuf in, int index, Value valueStore) {
+        long address = in.memoryAddress();
+        long addressWithIndex;
+
         // calculate integer part
         int intValue = 0;
         for (; ; index++) {
-            byte nextByte = in.getByte(index);
+            addressWithIndex = address + index;
+
+            byte nextByte = OffHeapMemory.getByte(addressWithIndex);
             if (nextByte == FLOAT_PART_SIGN) {
                 index++;
                 break;
@@ -141,7 +166,9 @@ final class PrimitiveCodecUtil {
         int floatValue = 0;
         int floatSizePowered = 1;
         for (; ; index++) {
-            byte nextByte = in.getByte(index);
+            addressWithIndex = address + index;
+
+            byte nextByte = OffHeapMemory.getByte(addressWithIndex);
             if (nextByte == 1) {
                 index++;
                 break;
@@ -158,9 +185,14 @@ final class PrimitiveCodecUtil {
     }
 
     static int decodeStringValue(ByteBuf in, int index, byte[] temp, Value value) {
+        long address = in.memoryAddress();
+
         int length = 0;
+        long addressWithIndex;
         for (; ; index++) {
-            byte nextByte = in.getByte(index);
+            addressWithIndex = address + index;
+
+            byte nextByte = OffHeapMemory.getByte(addressWithIndex);
             if (nextByte == DELIMITER) {
                 index++;
                 break;
@@ -176,11 +208,15 @@ final class PrimitiveCodecUtil {
     }
 
     static int decodeStringNativeValue(ByteBuf in, int index, OffHeapCharSequence strValue) {
-        long start = in.memoryAddress() + index;
+        long address = in.memoryAddress();
+        long start = address + index;
 
         int length = 0;
+        long addressWithIndex;
         for (; ; index++) {
-            byte nextByte = in.getByte(index);
+            addressWithIndex = address + index;
+
+            byte nextByte = OffHeapMemory.getByte(addressWithIndex);
             if (nextByte == DELIMITER) {
                 index++;
                 break;
@@ -194,9 +230,14 @@ final class PrimitiveCodecUtil {
     }
 
     static int decodeStringValueAsInt(ByteBuf in, int index, Value valueStore) {
+        long address = in.memoryAddress();
+
         int value = 0;
+        long addressWithIndex;
         for (; ; index++) {
-            byte nextByte = in.getByte(index);
+            addressWithIndex = address + index;
+
+            byte nextByte = OffHeapMemory.getByte(addressWithIndex);
             if (nextByte == DELIMITER) {
                 index++;
                 break;

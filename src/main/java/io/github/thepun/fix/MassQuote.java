@@ -62,12 +62,12 @@ public final class MassQuote extends AbstractReferenceCounted {
         return quoteSets[index];
     }
 
-    void initBuffer(ByteBuf buffer) {
+    public void initBuffer(ByteBuf buffer) {
         buffer.retain();
         this.buffer = buffer;
     }
 
-    void initQuoteSets(int quoteSetCount) {
+    public void initQuoteSets(int quoteSetCount) {
         this.quoteSetCount = quoteSetCount;
 
         // ensure enough data
@@ -137,7 +137,7 @@ public final class MassQuote extends AbstractReferenceCounted {
             return entries[index];
         }
 
-        void initEntries(int entryCount) {
+        public void initEntries(int entryCount) {
             this.entryCount = entryCount;
 
             // ensure enough data

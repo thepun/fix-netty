@@ -1,5 +1,6 @@
 package io.github.thepun.fix;
 
+import io.github.thepun.unsafe.OffHeapMemory;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -314,14 +315,25 @@ final class PrimeXmServerMarketDataHandler extends ChannelDuplexHandler {
 
         // calculate checksum
         int sum = 0;
-        for (int i = headStart; i < headIndex; i++) {
+       /* for (int i = headStart; i < headIndex; i++) {
             byte b = headBuf.getByte(i);
             sum += b;
         }
         for (int i = bodyStart; i < bodyIndex; i++) {
             byte b = bodyBuf.getByte(i);
             sum += b;
+        }*/
+        long stopAddress = headBuf.memoryAddress() + headIndex;
+        for (long address = headBuf.memoryAddress() + headStart; address < stopAddress; address++) {
+            byte b = OffHeapMemory.getByte(address);
+            sum += b;
         }
+        stopAddress = bodyBuf.memoryAddress() + bodyStart;
+        for (long address = bodyBuf.memoryAddress() + bodyStart; address < stopAddress; address++) {
+            byte b = OffHeapMemory.getByte(address);
+            sum += b;
+        }
+
         sum %= 256;
 
         // write checksum and finish with body
@@ -345,8 +357,8 @@ final class PrimeXmServerMarketDataHandler extends ChannelDuplexHandler {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        fixLogger.status("Error during ");
-
+        fixLogger.status("Error");
+        cause.printStackTrace();
         // TODO: process exception in channel
     }
 

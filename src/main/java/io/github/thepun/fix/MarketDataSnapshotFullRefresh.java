@@ -74,12 +74,12 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
         return entryCount;
     }
 
-    void initBuffer(ByteBuf buffer) {
+    public void initBuffer(ByteBuf buffer) {
         buffer.retain();
         this.buffer = buffer;
     }
 
-    void initEntries(int entryCount) {
+    public void initEntries(int entryCount) {
         this.entryCount = entryCount;
 
         // ensure we have enough data

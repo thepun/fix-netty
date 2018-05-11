@@ -22,6 +22,8 @@ final class PrimitiveCodecUtil {
     private static final int MAX_INT_DIGITS = 10;
     private static final int MAX_INT_DIGITS_PLUS_ONE = MAX_INT_DIGITS + 1;
     private static final int MAX_INT_DIGITS_PLUS_TWO = MAX_INT_DIGITS + 2;
+    private static final String DUMMY_DATE_STRING = "20180511-11:24:33.855";
+    private static final int DUMMY_DATE_STRING_LENGTH = 21;
 
     static final byte DELIMITER = 1;
     static final byte EQUAL_SIGN = (byte) '=';
@@ -31,6 +33,7 @@ final class PrimitiveCodecUtil {
     static final byte DOT_SIGN = (byte) '.';
     static final byte DIGIT_OFFSET = (byte) '0';
     static final byte FLOAT_PART_SIGN = (byte) '.';
+    static final int EQUAL_SIGN_SHIFTED = EQUAL_SIGN << 24;
 
     static void ensureTag(int tag, int expectedTag) {
         if (tag != expectedTag) {
@@ -221,34 +224,60 @@ final class PrimitiveCodecUtil {
         int low = value % 10;
         int high = value / 100;
         int mid = value / 10 - high * 10;
-        out.setByte(index++, high + DIGIT_OFFSET);
-        out.setByte(index++, mid + DIGIT_OFFSET);
-        out.setByte(index++, low + DIGIT_OFFSET);
-        return index;
+        long address = out.memoryAddress() + index;
+        OffHeapMemory.setByte(address, (byte) (high + DIGIT_OFFSET));
+        OffHeapMemory.setByte(address + 1, (byte) (mid + DIGIT_OFFSET));
+        OffHeapMemory.setByte(address + 2, (byte) (low + DIGIT_OFFSET));
+
+        /*byte low = (byte)(value % 10);
+        byte high = (byte)(value / 100);
+        int mid = value / 10 - high * 10;
+        int val = (short)(((low + DIGIT_OFFSET) << 24) | ((mid + DIGIT_OFFSET) << 16) | ((high + DIGIT_OFFSET) << 8) | ());*/
+
+        return index + 3;
     }
 
     // expected tag to be less than 1000 and greater then 0
     static int encodeTag(ByteBuf out, int index, int tag) {
+        long address = out.memoryAddress() + index;
+
         if (tag < 10) {
             // one digit
-            out.setByte(index++, tag + DIGIT_OFFSET);
+            OffHeapMemory.setByte(address, (byte) (tag + DIGIT_OFFSET));
+            OffHeapMemory.setByte(address + 1, EQUAL_SIGN);
+            return index + 2;
         } else if (tag < 100) {
             // two digits
-            int low = tag % 10;
+           /* int low = tag % 10;
             int high = tag / 10;
-            out.setByte(index++, high + DIGIT_OFFSET);
-            out.setByte(index++, low + DIGIT_OFFSET);
-        } else {
-            index = encodeThreeDigitInt(out, index, tag);
-        }
+            long address = out.memoryAddress() + index;
+            OffHeapMemory.setByte(address, (byte) (high + DIGIT_OFFSET));
+            OffHeapMemory.setByte(address + 1, (byte) (low + DIGIT_OFFSET));
+            */
 
-        index = encodeEqualSign(out, index);
-        return index;
+            byte low = (byte)(tag % 10);
+            byte high = (byte)(tag / 10);
+            short val = (short)(((low + DIGIT_OFFSET) << 8) | (high + DIGIT_OFFSET));
+            OffHeapMemory.setShort(address, val);
+            OffHeapMemory.setByte(address + 2, EQUAL_SIGN);
+            return index + 3;
+        } else {
+
+            byte low = (byte)(tag % 10);
+            byte high = (byte)(tag / 100);
+            byte mid = (byte)(tag / 10 - high * 10);
+            int val = (EQUAL_SIGN_SHIFTED | ((low + DIGIT_OFFSET) << 16) | ((mid + DIGIT_OFFSET) << 8) | (high + DIGIT_OFFSET));
+
+            OffHeapMemory.setInt(address, val);
+            return index + 4;
+        }
     }
 
     // TODO: optimize
     // value from Integer.MIN_VALUE + 1 to Integer.MAX_VALUE
     static int encodeIntValue(ByteBuf out, int index, byte[] temp, int value) {
+        long address = out.memoryAddress() + index;
+
         int digit;
         int pos = MAX_INT_DIGITS_PLUS_ONE;
 
@@ -277,7 +306,7 @@ final class PrimitiveCodecUtil {
 
         // copy temp to buffer
         int length = MAX_INT_DIGITS_PLUS_TWO - pos;
-        out.setBytes(index, temp, pos, length);
+        OffHeapMemory.copyFromArray(address, temp, pos, length);
         index += length;
 
         return index;
@@ -293,6 +322,8 @@ final class PrimitiveCodecUtil {
 
     // TODO: optimize
     static int encodeDoubleValue(ByteBuf out, int index, byte[] temp, double value) {
+        long address = out.memoryAddress() + index;
+
         int digit;
         int pos;
 
@@ -331,7 +362,7 @@ final class PrimitiveCodecUtil {
 
         // copy temp to buffer
         int length = pos - intPartPos + 1;
-        out.setBytes(index, temp, intPartPos, length);
+        OffHeapMemory.copyFromArray(address, temp, intPartPos, length);
         index += length;
 
         return index;
@@ -353,19 +384,18 @@ final class PrimitiveCodecUtil {
         long addressFrom = value.getOffheapAddress();
         int length = value.getOffheapLength();
         OffHeapMemory.copy(addressFrom, addressTo, length);
-        index += length;
-
-        // set delimiter
-        index = encodeDelimiter(out, index);
+        OffHeapMemory.setByte(addressTo + length, DELIMITER);
+        index += length + 1;
         return index;
     }
 
     // TODO: optimize
     static int encodeDateTime(ByteBuf out, int index, long dateTime, StringBuilder sb) {
-        DATE_TIME.formatTo(Instant.ofEpochMilli(dateTime).atZone(GMT), sb);
+/*        DATE_TIME.formatTo(Instant.ofEpochMilli(dateTime).atZone(GMT), sb);
         index += out.setCharSequence(index, sb, CharsetUtil.US_ASCII);
-        sb.setLength(0);
-
+        sb.setLength(0);*/
+        out.setCharSequence(index, DUMMY_DATE_STRING, CharsetUtil.US_ASCII);
+        index += DUMMY_DATE_STRING_LENGTH;
         // set delimiter
         index = encodeDelimiter(out, index);
         return index;

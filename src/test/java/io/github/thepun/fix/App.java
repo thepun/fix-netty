@@ -2,6 +2,7 @@ package io.github.thepun.fix;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ResourceLeakDetector;
 
@@ -18,7 +19,8 @@ public class App {
     public static void main(String[] args) throws InterruptedException {
         int quoteCount = 1000000;
 
-        //System.setProperty("io.netty.allocator.type", "unpooled");
+        System.setProperty("io.netty.recycler.linkCapacity", "10000000");
+        System.setProperty("io.netty.recycler.ratio", "0");
         //System.setProperty("io.netty.leakDetection.targetRecords", "100");
 
         ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.DISABLED);
@@ -84,62 +86,52 @@ public class App {
         client.start();
         subscriptionLatch.await();
 
-        ByteBuf buffer = PooledByteBufAllocator.DEFAULT.directBuffer();
+        ByteBuf buffer = Unpooled.directBuffer();
         long index = buffer.memoryAddress() + buffer.readerIndex();
-
-        MassQuote quote = MassQuote.reuseOrCreate();
-        quote.initBuffer(buffer);
-        quote.initQuoteSets(1);
         String quoteId = "quote";
         buffer.writeCharSequence(quoteId, CharsetUtil.US_ASCII);
-        quote.getQuoteId().setAddress(index, quoteId.length());
-        quote.setQuoteIdDefined(true);
+        long quoteIdIndex = index;
         index += quoteId.length();
-
-        MassQuote.QuoteSet quoteSet = quote.getQuoteSet(0);
-        quoteSet.initEntries(1);
         String quoteSetId = "quoteSet";
         buffer.writeCharSequence(quoteSetId, CharsetUtil.US_ASCII);
-        quoteSet.getQuoteSetId().setAddress(index, quoteSetId.length());
-        quoteSet.setQuoteSetIdDefined(true);
+        long quotSetIdIndex = index;
         index += quoteSetId.length();
+        String quoteEntryId = "quoteEntry";
+        buffer.writeCharSequence(quoteEntryId, CharsetUtil.US_ASCII);
+        long quoteEntryIdIndex = index;
 
-        MassQuote.QuoteEntry entry = quoteSet.getEntry(0);
-        String quoteEntrytId = "quoteEntry";
-        buffer.writeCharSequence(quoteEntrytId, CharsetUtil.US_ASCII);
-        entry.getQuoteEntryId().setAddress(index, quoteEntrytId.length());
-        entry.setQuoteEntryIdDefined(true);
-        entry.setBidSize(1000);
-        entry.setOfferSize(2000);
-        entry.setBidSpotRate(11234);
-        entry.setOfferSpotRate(11235);
-
-        // first
-        for (int k = 0; k < 10; k++) {
+        for (int k = 0; k < 100; k++) {
             quoteLatch = new CountDownLatch(quoteCount);
+            start = System.currentTimeMillis();
             for (int i = 0; i < quoteCount; i++) {
-                quote.retain();
+                MassQuote quote = MassQuote.reuseOrCreate();
+                quote.initBuffer(buffer);
+                quote.initQuoteSets(1);
+                quote.getQuoteId().setAddress(quoteIdIndex, quoteId.length());
+                quote.setQuoteIdDefined(true);
+
+                MassQuote.QuoteSet quoteSet = quote.getQuoteSet(0);
+                quoteSet.initEntries(1);
+                quoteSet.getQuoteSetId().setAddress(quotSetIdIndex, quoteSetId.length());
+                quoteSet.setQuoteSetIdDefined(true);
+
+                MassQuote.QuoteEntry entry = quoteSet.getEntry(0);
+                entry.getQuoteEntryId().setAddress(quoteEntryIdIndex, quoteEntryId.length());
+                entry.setQuoteEntryIdDefined(true);
+                entry.setBidSize(1000);
+                entry.setOfferSize(2000);
+                entry.setBidSpotRate(11234);
+                entry.setOfferSpotRate(11235);
+
                 server.send(quote);
             }
             quoteLatch.await();
+            finish = System.currentTimeMillis();
+
+            System.out.println("Finished: " + (finish - start) + "ms");
+            System.gc();
+            Thread.sleep(3000);
         }
-
-        Thread.sleep(3000);
-
-        // second
-        quoteLatch = new CountDownLatch(quoteCount);
-        start = System.currentTimeMillis();
-        for (int i = 0; i < quoteCount; i++) {
-            quote.retain();
-            server.send(quote);
-        }
-        quoteLatch.await();
-        finish = System.currentTimeMillis();
-
-        System.out.println("Finished: " + (finish - start) + "ms");
-
-        System.gc();
-
     }
 
 

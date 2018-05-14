@@ -279,6 +279,12 @@ final class PrimeXmServerMarketDataHandler extends ChannelDuplexHandler {
             MassQuote massQuote = (MassQuote) msg;
             bodyIndex = PrimeXmCodecUtil.encodeMassQuote(bodyBuf, bodyIndex, temp, massQuote);
             massQuote.release();
+        } else if (msg instanceof MarketDataSnapshotFullRefresh) {
+            bodyBuf.setByte(msgTypeIndex, FixMsgTypes.MARKET_DATA_SNAPSHOT_FULL_REFRESH);
+
+            MarketDataSnapshotFullRefresh marketDataSnapshotFullRefresh = (MarketDataSnapshotFullRefresh) msg;
+            bodyIndex = PrimeXmCodecUtil.encodeMarketDataSnapshotFullRefresh(bodyBuf, bodyIndex, temp, marketDataSnapshotFullRefresh);
+            marketDataSnapshotFullRefresh.release();
         } else if (msg instanceof Heartbeat) {
             bodyBuf.setByte(msgTypeIndex, FixMsgTypes.HEARTBEAT);
 

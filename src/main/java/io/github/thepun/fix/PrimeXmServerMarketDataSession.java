@@ -98,6 +98,16 @@ public final class PrimeXmServerMarketDataSession {
         //channel.write(massQuote, channel.voidPromise());
     }
 
+    public void send(MarketDataSnapshotFullRefresh marketDataSnapshotFullRefresh) {
+        Channel channel = lastClientChannel;
+        if (channel == null) {
+            fixLogger.status("MarketDataSnapshotFullRefresh message is dropped: session is not connected");
+            return;
+        }
+
+        channel.writeAndFlush(marketDataSnapshotFullRefresh, channel.voidPromise());
+    }
+
     public void send(MarketDataRequestReject reject) {
         Channel channel = lastClientChannel;
         if (channel == null) {

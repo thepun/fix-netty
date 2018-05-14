@@ -285,6 +285,51 @@ final class PrimeXmCodecUtil {
         return index;
     }
 
+    public static int encodeMarketDataSnapshotFullRefresh(ByteBuf out, int index, byte[] temp, MarketDataSnapshotFullRefresh message) {
+        // symbol
+        if (message.isSymbolDefined()) {
+            index = encodeTag(out, index, FixFields.SYMBOL);
+            index = encodeStringNativeValue(out, index, message.getSymbol());
+        }
+
+        // req id
+        if (message.isMdReqIdDefined()) {
+            index = encodeTag(out, index, FixFields.MD_REQ_ID);
+            index = encodeStringNativeValue(out, index, message.getMdReqId());
+        }
+
+        // count of entries
+        index = encodeTag(out, index, FixFields.NO_MD_ENTRIES);
+        index = encodeIntValue(out, index, temp, message.getEntryCount());
+
+        // entries
+        for (int i = 0; i < message.getEntryCount(); i++) {
+            MarketDataSnapshotFullRefresh.MDEntry entry = message.getEntry(i);
+
+            // type
+            index = encodeTag(out, index, FixFields.MD_ENTRY_TYPE);
+            index = encodeIntValue(out, index, temp, entry.getMdEntryType());
+
+            // price
+            index = encodeTag(out, index, FixFields.MD_ENTRY_PX);
+            index = encodeDoubleValue(out, index, temp, entry.getMdEntryPX());
+
+            // volume
+            index = encodeTag(out, index, FixFields.MD_ENTRY_SIZE);
+            index = encodeDoubleValue(out, index, temp, entry.getMdEntrySize());
+
+            // quote id
+            index = encodeTag(out, index, FixFields.QUOTE_ENTRY_ID);
+            index = encodeStringNativeValue(out, index, entry.getId());
+
+            // issuer
+            index = encodeTag(out, index, FixFields.ISSUER);
+            index = encodeStringNativeValue(out, index, entry.getIssuer());
+        }
+
+        return index;
+    }
+
     public static int encodeMassQuoteAcknowledgement(ByteBuf out, int index, MassQuoteAcknowledgement message) {
         // quote id
         if (message.isQuoteIdDefined()) {

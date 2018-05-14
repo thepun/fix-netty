@@ -58,7 +58,9 @@ public class MassQuoteRoundTripApp {
                     System.out.println("Quote(" + quoteSet.getQuoteSetId().toString() + "): bid=" + entry.getBidSpotRate() + " ask=" + entry.getOfferSpotRate());
                     quotes.release();*/
                 })
-                .snapshotListener(snapshot -> {})
+                .snapshotListener(snapshot -> {
+                    quoteLatch.countDown();
+                })
                 .primeXmClient();
 
         server = new MarketDataSessionBuilder()
@@ -92,38 +94,74 @@ public class MassQuoteRoundTripApp {
         index += quoteId.length();
         String quoteSetId = "quoteSet";
         buffer.writeCharSequence(quoteSetId, CharsetUtil.US_ASCII);
-        long quotSetIdIndex = index;
+        long quoteSetIdIndex = index;
         index += quoteSetId.length();
         String quoteEntryId = "quoteEntry";
         buffer.writeCharSequence(quoteEntryId, CharsetUtil.US_ASCII);
         long quoteEntryIdIndex = index;
+        index += quoteEntryId.length();
+        String symbol = "EUR/USD";
+        buffer.writeCharSequence(symbol, CharsetUtil.US_ASCII);
+        long symbolIndex = index;
 
         for (int k = 0; k < 100; k++) {
             quoteLatch = new CountDownLatch(quoteCount);
             start = System.currentTimeMillis();
+
             for (int i = 0; i < quoteCount; i++) {
-                MassQuote quote = MassQuote.reuseOrCreate();
-                quote.initBuffer(buffer);
-                quote.initQuoteSets(1);
-                quote.getQuoteId().setAddress(quoteIdIndex, quoteId.length());
-                quote.setQuoteIdDefined(true);
+                /*if (i % 2 == 0) {
 
-                MassQuote.QuoteSet quoteSet = quote.getQuoteSet(0);
-                quoteSet.initEntries(1);
-                quoteSet.getQuoteSetId().setAddress(quotSetIdIndex, quoteSetId.length());
-                quoteSet.setQuoteSetIdDefined(true);
+                    MassQuote quote = MassQuote.reuseOrCreate();
+                    quote.initBuffer(buffer);
+                    quote.initQuoteSets(1);
+                    quote.getQuoteId().setAddress(quoteIdIndex, quoteId.length());
+                    quote.setQuoteIdDefined(true);
 
-                MassQuote.QuoteEntry entry = quoteSet.getEntry(0);
-                entry.getQuoteEntryId().setAddress(quoteEntryIdIndex, quoteEntryId.length());
-                entry.setQuoteEntryIdDefined(true);
-                entry.setBidSize(1000);
-                entry.setOfferSize(2000);
-                entry.setBidSpotRate(11234);
-                entry.setOfferSpotRate(11235);
+                    MassQuote.QuoteSet quoteSet = quote.getQuoteSet(0);
+                    quoteSet.initEntries(1);
+                    quoteSet.getQuoteSetId().setAddress(quoteSetIdIndex, quoteSetId.length());
+                    quoteSet.setQuoteSetIdDefined(true);
 
-                server.send(quote);
+                    MassQuote.QuoteEntry entry = quoteSet.getEntry(0);
+                    entry.getQuoteEntryId().setAddress(quoteEntryIdIndex, quoteEntryId.length());
+                    entry.setQuoteEntryIdDefined(true);
+                    entry.setBidSize(1000);
+                    entry.setOfferSize(2000);
+                    entry.setBidSpotRate(11234);
+                    entry.setOfferSpotRate(11235);
+
+                    server.send(quote);
+                } else {*/
+                    MarketDataSnapshotFullRefresh quote = MarketDataSnapshotFullRefresh.reuseOrCreate();
+                    quote.initBuffer(buffer);
+                    quote.initEntries(2);
+                    quote.getMdReqId().setAddress(quoteIdIndex, quoteId.length());
+                    quote.setMdReqIdDefined(true);
+                    quote.getSymbol().setAddress(symbolIndex, symbol.length());
+                    quote.setSymbolDefined(true);
+
+                    MarketDataSnapshotFullRefresh.MDEntry bid = quote.getEntry(0);
+                    bid.setMdEntryType(FixEnums.MD_ENTRY_TYPE_BID);
+                    bid.setMdEntrySize(1000);
+                    bid.setMdEntryPX(11234);
+                    bid.getId().setAddress(quoteSetIdIndex, quoteSetId.length());
+                    bid.setIdDefined(true);
+                    bid.getIssuer().setAddress(quoteEntryIdIndex, quoteEntryId.length());
+                    bid.setIssuerDefined(true);
+
+                    MarketDataSnapshotFullRefresh.MDEntry ask = quote.getEntry(1);
+                    ask.setMdEntryType(FixEnums.MD_ENTRY_TYPE_BID);
+                    ask.setMdEntrySize(2000);
+                    ask.setMdEntryPX(11235);
+                    ask.getId().setAddress(quoteSetIdIndex, quoteSetId.length());
+                    ask.setIdDefined(true);
+                    ask.getIssuer().setAddress(quoteEntryIdIndex, quoteEntryId.length());
+                    ask.setIssuerDefined(true);
+
+                    server.send(quote);
+               // }
             }
-            //server.flush();
+
             quoteLatch.await();
             finish = System.currentTimeMillis();
 

@@ -109,8 +109,7 @@ public class MassQuoteRoundTripApp {
             start = System.currentTimeMillis();
 
             for (int i = 0; i < quoteCount; i++) {
-                /*if (i % 2 == 0) {
-
+                if (i % 2 == 0) {
                     MassQuote quote = MassQuote.reuseOrCreate();
                     quote.initBuffer(buffer);
                     quote.initQuoteSets(1);
@@ -131,7 +130,7 @@ public class MassQuoteRoundTripApp {
                     entry.setOfferSpotRate(11235);
 
                     server.send(quote);
-                } else {*/
+                } else {
                     MarketDataSnapshotFullRefresh quote = MarketDataSnapshotFullRefresh.reuseOrCreate();
                     quote.initBuffer(buffer);
                     quote.initEntries(2);
@@ -159,7 +158,7 @@ public class MassQuoteRoundTripApp {
                     ask.setIssuerDefined(true);
 
                     server.send(quote);
-               // }
+                }
             }
 
             quoteLatch.await();

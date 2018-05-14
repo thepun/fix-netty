@@ -156,7 +156,7 @@ final class PrimitiveCodecUtil {
                 break;
             } else if (nextByte == DELIMITER) {
                 valueStore.setDoubleValue(intValue);
-                return index;
+                return index + 1;
             }
 
             intValue = intValue * 10 + (nextByte - DIGIT_OFFSET);
@@ -432,11 +432,11 @@ final class PrimitiveCodecUtil {
 
     // TODO: optimize
     static int encodeDateTime(ByteBuf out, int index, long dateTime, StringBuilder sb) {
-/*        DATE_TIME.formatTo(Instant.ofEpochMilli(dateTime).atZone(GMT), sb);
+        DATE_TIME.formatTo(Instant.ofEpochMilli(dateTime).atZone(GMT), sb);
         index += out.setCharSequence(index, sb, CharsetUtil.US_ASCII);
-        sb.setLength(0);*/
-        out.setCharSequence(index, DUMMY_DATE_STRING, CharsetUtil.US_ASCII);
-        index += DUMMY_DATE_STRING_LENGTH;
+        sb.setLength(0);
+        //out.setCharSequence(index, DUMMY_DATE_STRING, CharsetUtil.US_ASCII);
+        //index += DUMMY_DATE_STRING_LENGTH;
         // set delimiter
         index = encodeDelimiter(out, index);
         return index;

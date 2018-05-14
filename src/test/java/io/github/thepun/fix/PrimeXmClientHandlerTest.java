@@ -7,7 +7,6 @@ import org.mockito.ArgumentCaptor;
 
 import static io.github.thepun.fix.FixHelper.*;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class PrimeXmClientHandlerTest {
@@ -15,14 +14,16 @@ class PrimeXmClientHandlerTest {
     private FixSessionInfo fixSessionInfo;
     private MarketDataReadyListener readyListener;
     private MarketDataQuotesListener quotesListener;
+    private MarketDataSnapshotListener snapshotListener;
     private PrimeXmClientMarketDataHandler handler;
 
     @BeforeEach
     void prepareMocks() {
         readyListener = mock(MarketDataReadyListener.class);
         quotesListener = mock(MarketDataQuotesListener.class);
+        snapshotListener = mock(MarketDataSnapshotListener.class);
         fixSessionInfo = new FixSessionInfo("qwe_", "1asd", "+--341", "sdf", "user", "pass");
-        handler = new PrimeXmClientMarketDataHandler(fixSessionInfo, NoOpFixLogger.INSTANCE, readyListener, quotesListener, 30);
+        handler = new PrimeXmClientMarketDataHandler(fixSessionInfo, NoOpFixLogger.INSTANCE, readyListener, quotesListener, snapshotListener,30);
     }
 
     @Test

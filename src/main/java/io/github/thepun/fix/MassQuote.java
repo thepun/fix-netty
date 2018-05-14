@@ -15,10 +15,14 @@ public final class MassQuote extends AbstractReferenceCounted {
             return new MassQuote(handle);
         }
     };
+    //private static final SpscArrayQueue<MassQuote> OBJECT_QUEUE = new SpscArrayQueue<>(1000000);
 
     public static MassQuote reuseOrCreate() {
         MassQuote massQuote = RECYCLER.get();
-        //massQuote.retain();
+        //MassQuote massQuote = OBJECT_QUEUE.peek();
+        //if (massQuote == null) {
+        //    massQuote = new MassQuote();
+        //}
         return massQuote;
     }
 
@@ -100,6 +104,9 @@ public final class MassQuote extends AbstractReferenceCounted {
         }
 
         setRefCnt(1);
+
+        //MemoryFence.store();
+        //OBJECT_QUEUE.offer(this);
         recyclerHandle.recycle(this);
     }
 

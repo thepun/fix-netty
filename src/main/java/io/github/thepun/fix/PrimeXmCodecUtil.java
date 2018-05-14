@@ -164,18 +164,21 @@ final class PrimeXmCodecUtil {
     static int decodeMarketDataSnapshotFullRefresh(ByteBuf in, int index, Value value, MarketDataSnapshotFullRefresh message) {
         message.initBuffer(in);
 
-        // req id
-        index = decodeTag(in, index, value);
-        index = decodeStringNativeValue(in, index, message.getMdReqId());
-        message.setMdReqIdDefined(true);
-
         // symbol
         index = decodeTag(in, index, value);
+        ensureTag(value.getIntValue(), FixFields.SYMBOL);
         index = decodeStringNativeValue(in, index, message.getSymbol());
         message.setSymbolDefined(true);
 
+        // req id
+        index = decodeTag(in, index, value);
+        ensureTag(value.getIntValue(), FixFields.MD_REQ_ID);
+        index = decodeStringNativeValue(in, index, message.getMdReqId());
+        message.setMdReqIdDefined(true);
+
         // count of MD entries
         index = decodeTag(in, index, value);
+        ensureTag(value.getIntValue(), FixFields.NO_MD_ENTRIES);
         index = decodeIntValue(in, index, value);
         int mdEntriesCount = value.getIntValue();
         message.initEntries(mdEntriesCount);
@@ -183,28 +186,38 @@ final class PrimeXmCodecUtil {
         // MD entry loop
         for (int i = 0; i < mdEntriesCount; i++) {
             MarketDataSnapshotFullRefresh.MDEntry entry = message.getEntry(i);
+            entry.setIdDefined(true);
+            entry.setIssuerDefined(true);
             entry.setSymbolDefined(false);
             entry.setCurrencyDefined(false);
 
             // type
             index = decodeTag(in, index, value);
+            ensureTag(value.getIntValue(), FixFields.MD_ENTRY_TYPE);
             index = decodeIntValue(in, index, value);
             entry.setMdEntryType(value.getIntValue());
 
-            // id
-            index = decodeTag(in, index, value);
-            index = decodeStringNativeValue(in, index, entry.getId());
-            entry.setIdDefined(true);
-
             // price
             index = decodeTag(in, index, value);
+            ensureTag(value.getIntValue(), FixFields.MD_ENTRY_PX);
             index = decodeDoubleValue(in, index, value);
             entry.setMdEntryPX(value.getDoubleValue());
 
             // volume
             index = decodeTag(in, index, value);
+            ensureTag(value.getIntValue(), FixFields.MD_ENTRY_SIZE);
             index = decodeDoubleValue(in, index, value);
             entry.setMdEntrySize(value.getDoubleValue());
+
+            // quote id
+            index = decodeTag(in, index, value);
+            ensureTag(value.getIntValue(), FixFields.QUOTE_ENTRY_ID);
+            index = decodeStringNativeValue(in, index, entry.getId());
+
+            // issuer
+            index = decodeTag(in, index, value);
+            ensureTag(value.getIntValue(), FixFields.ISSUER);
+            index = decodeStringNativeValue(in, index, entry.getIssuer());
         }
 
         return index;
@@ -272,5 +285,13 @@ final class PrimeXmCodecUtil {
         return index;
     }
 
+    public static int encodeMassQuoteAcknowledgement(ByteBuf out, int index, MassQuoteAcknowledgement message) {
+        // quote id
+        if (message.isQuoteIdDefined()) {
+            index = encodeTag(out, index, FixFields.QUOTE_ID);
+            index = encodeStringNativeValue(out, index, message.getQuoteId());
+        }
 
+        return index;
+    }
 }

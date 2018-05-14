@@ -29,6 +29,7 @@ final class PrimeXmClientMarketDataHandler extends ChannelDuplexHandler {
     private final FixSessionInfo sessionInfo;
     private final MarketDataReadyListener readyListener;
     private final MarketDataQuotesListener quotesListener;
+    private final MarketDataSnapshotListener snapshotListener;
 
     private Value value;
     private byte[] temp;
@@ -43,11 +44,14 @@ final class PrimeXmClientMarketDataHandler extends ChannelDuplexHandler {
     private int sessionHeaderLength;
     private ScheduledFuture<?> heartbeatSchedule;
 
-    PrimeXmClientMarketDataHandler(FixSessionInfo sessionInfo, FixLogger fixLogger, MarketDataReadyListener readyListener, MarketDataQuotesListener quotesListener, int heartbeatInterval) {
+    PrimeXmClientMarketDataHandler(FixSessionInfo sessionInfo, FixLogger fixLogger, MarketDataReadyListener readyListener,
+                                   MarketDataQuotesListener quotesListener, MarketDataSnapshotListener snapshotListener,
+                                   int heartbeatInterval) {
         this.fixLogger = fixLogger;
         this.sessionInfo = sessionInfo;
         this.readyListener = readyListener;
         this.quotesListener = quotesListener;
+        this.snapshotListener = snapshotListener;
         this.heartbeatInterval = heartbeatInterval;
     }
 
@@ -197,15 +201,17 @@ final class PrimeXmClientMarketDataHandler extends ChannelDuplexHandler {
 
             // read message content
             if (msgType == FixMsgTypes.MASS_QUOTE) {
-                // fast path
+                // fast path for mass quote
                 MassQuote quotes = MassQuote.reuseOrCreate();
                 index = decodeMassQuote(in, index, value, quotes);
                 quotesListener.onMarketData(quotes);
-                if (quotes.isQuoteIdDefined()) {
-                    // TODO: implement Mass Quote Acknowledge
-                }
                 quotes.release();
-                Object o = null;
+            } else if (msgType == FixMsgTypes.MARKET_DATA_SNAPSHOT_FULL_REFRESH) {
+                // snapshot
+                MarketDataSnapshotFullRefresh marketDataSnapshotFullRefresh = MarketDataSnapshotFullRefresh.reuseOrCreate();
+                index = decodeMarketDataSnapshotFullRefresh(in, index, value, marketDataSnapshotFullRefresh);
+                snapshotListener.onMarketData(marketDataSnapshotFullRefresh);
+                marketDataSnapshotFullRefresh.release();
             } else {
                 // slow path
                 switch (msgType) {
@@ -303,7 +309,13 @@ final class PrimeXmClientMarketDataHandler extends ChannelDuplexHandler {
         bodyIndex = encodeDateTime(bodyBuf, bodyIndex, currentTime, sb);
 
         // write body
-        if (msg instanceof Heartbeat) {
+        if (msg instanceof MassQuoteAcknowledgement) {
+            bodyBuf.setByte(msgTypeIndex, FixMsgTypes.MASS_QUOTE_ACKNOWLEDGEMENT);
+
+            MassQuoteAcknowledgement massQuoteAcknowledgement = (MassQuoteAcknowledgement) msg;
+            bodyIndex = PrimeXmCodecUtil.encodeMassQuoteAcknowledgement(bodyBuf, bodyIndex, massQuoteAcknowledgement);
+            massQuoteAcknowledgement.release();
+        } else if (msg instanceof Heartbeat) {
             bodyBuf.setByte(msgTypeIndex, FixMsgTypes.HEARTBEAT);
 
             Heartbeat heartbeat = (Heartbeat) msg;

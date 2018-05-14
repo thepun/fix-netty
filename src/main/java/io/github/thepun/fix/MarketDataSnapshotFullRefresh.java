@@ -36,6 +36,8 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
 
         mdReqId = new OffHeapCharSequence();
         symbol = new OffHeapCharSequence();
+
+        entries = new MDEntry[0];
     }
 
     public OffHeapCharSequence getMdReqId() {
@@ -108,6 +110,7 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
             buffer = null;
         }
 
+        setRefCnt(1);
         recyclerHandle.recycle(this);
     }
 
@@ -116,10 +119,12 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
 
         private final OffHeapCharSequence id;
         private final OffHeapCharSequence symbol;
+        private final OffHeapCharSequence issuer;
         private final OffHeapCharSequence currency;
 
         private boolean idDefined;
         private boolean symbolDefined;
+        private boolean issuerDefined;
         private boolean currencyDefined;
         private int mdUpdateAction;
         private int mdEntryType;
@@ -129,6 +134,7 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
 
         private MDEntry() {
             id = new OffHeapCharSequence();
+            issuer = new OffHeapCharSequence();
             symbol = new OffHeapCharSequence();
             currency = new OffHeapCharSequence();
         }
@@ -143,6 +149,10 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
 
         public OffHeapCharSequence getCurrency() {
             return currency;
+        }
+
+        public OffHeapCharSequence getIssuer() {
+            return issuer;
         }
 
         public boolean isIdDefined() {
@@ -167,6 +177,14 @@ public final class MarketDataSnapshotFullRefresh extends AbstractReferenceCounte
 
         public void setCurrencyDefined(boolean currencyDefined) {
             this.currencyDefined = currencyDefined;
+        }
+
+        public boolean isIssuerDefined() {
+            return issuerDefined;
+        }
+
+        public void setIssuerDefined(boolean issuerDefined) {
+            this.issuerDefined = issuerDefined;
         }
 
         public int getMdUpdateAction() {

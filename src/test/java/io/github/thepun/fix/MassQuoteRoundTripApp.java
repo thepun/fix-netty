@@ -1,16 +1,13 @@
 package io.github.thepun.fix;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ResourceLeakDetector;
-import io.netty.util.concurrent.FastThreadLocalThread;
 
 import java.util.concurrent.CountDownLatch;
 
-public class App {
+public class MassQuoteRoundTripApp {
 
     private static long start;
     private static long finish;
@@ -30,7 +27,6 @@ public class App {
         CountDownLatch subscriptionLatch = new CountDownLatch(1);
 
         client = new MarketDataSessionBuilder()
-                .logger(new ConsoleLogger("client"))
                 .host("localhost")
                 .port(12345)
                 .senderCompId("local")
@@ -62,10 +58,10 @@ public class App {
                     System.out.println("Quote(" + quoteSet.getQuoteSetId().toString() + "): bid=" + entry.getBidSpotRate() + " ask=" + entry.getOfferSpotRate());
                     quotes.release();*/
                 })
+                .snapshotListener(snapshot -> {})
                 .primeXmClient();
 
         server = new MarketDataSessionBuilder()
-                .logger(new ConsoleLogger("server"))
                 .host("localhost")
                 .port(12345)
                 .senderCompId("local")

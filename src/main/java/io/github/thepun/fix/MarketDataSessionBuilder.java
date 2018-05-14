@@ -135,6 +135,10 @@ public final class MarketDataSessionBuilder {
             throw new IllegalStateException("Empty quote listener");
         }
 
+        if (snapshotListener == null) {
+            throw new IllegalStateException("Empty snapshot listener");
+        }
+
         FixLogger localFixLogger = fixLogger;
         if (localFixLogger == null) {
             localFixLogger = NoOpFixLogger.INSTANCE;
@@ -152,7 +156,7 @@ public final class MarketDataSessionBuilder {
 
         FixSessionInfo fixSessionInfo = new FixSessionInfo(senderCompId, senderSubId, targetCompId, targetSubId, username, password);
 
-        return new PrimeXmClientMarketDataSession(localExecutor, fixSessionInfo, localFixLogger, quotesListener,
+        return new PrimeXmClientMarketDataSession(localExecutor, fixSessionInfo, localFixLogger, quotesListener, snapshotListener,
                 readyListener, connectListener, disconnectListener, host, port, reconnectInterval, heartbeatInterval);
     }
 
